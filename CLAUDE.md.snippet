@@ -1,0 +1,26 @@
+<!-- Append this block to the project's .claude/CLAUDE.md (or repo-root CLAUDE.md).
+     This is the ONLY part of the intake mechanism that is truly always-on —
+     it loads unconditionally every session, unlike Skills which load on match. -->
+
+## Intake Rule (always active)
+
+Before implementing **any** request — even one that sounds obvious — check whether the information provided is sufficient to form a complete business requirement, using the checklist in `ka-intake` (`.claude/skills/ka-intake/references/completeness-checklist.md`).
+
+Hard Rules:
+- If a business-level field is missing and **could affect the outcome**, ask first. Do not infer or pick "sensible defaults" on behalf of the user.
+- This is distinct from harmless technical assumptions (variable naming, code format) — those do not require asking.
+- Do not skip the check just because the request "sounds simple." "Sounds simple" is not evidence — use the checklist to confirm, not intuition.
+- Batch clarifying questions into a single message; do not ask one at a time in a way that drags the conversation (see limits in `ka-intake/SKILL.md`).
+
+If the request already includes a locked decision (`decisions.json` with `status: "locked"`), treat intake as complete — do not ask again.
+
+## Git Guardian Rule (always active)
+
+Before performing **any** git operation — including `git status`, `git add`, `git commit`, `git push`, `checkout`, `rebase`, `reset`, `stash`, `merge` — load and follow the rules in `git-guardian` (`.claude/skills/git-guardian/SKILL.md`).
+
+Hard Rules:
+- Run the Pre-flight Checklist (section 0) before touching any file.
+- Classify every git command by its risk level (SAFE / WARNING / DANGEROUS / FORBIDDEN) before executing.
+- Never run FORBIDDEN commands (`git reset --hard`, `git push --force`, `git clean -fd`) without explicit user confirmation.
+- Never switch branches, stash, or commit without explicit user request.
+- On any git error: STOP immediately, report state, wait for user instructions. Do not attempt self-recovery.

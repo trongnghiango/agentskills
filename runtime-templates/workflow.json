@@ -1,0 +1,78 @@
+{
+  "initial": "DESIGN_NEEDED",
+  "states": {
+    "DESIGN_NEEDED": {
+      "transitions": {
+        "PLAN_COMPLEX": "ADR_GATE",
+        "PLAN_STANDARD": "LOCKED_DECISION",
+        "PLAN_PATCH": "LOCKED_DECISION",
+        "INIT": "DESIGN_NEEDED"
+      }
+    },
+    "ADR_GATE": {
+      "gate": "ADR_APPROVAL_ON_COMPLEX",
+      "transitions": {
+        "APPROVE": "LOCKED_DECISION",
+        "REJECT": "DESIGN_NEEDED"
+      }
+    },
+    "LOCKED_DECISION": {
+      "transitions": {
+        "EXECUTE_BE": "BE_REVIEW_GATE",
+        "EXECUTE_OPS": "DEPLOY_RESULT",
+        "EXECUTE_FE": "BUILD_DONE",
+        "EXECUTE_SCHEMA": "BUILD_DONE",
+        "EXECUTE_CONTRACT": "BUILD_DONE",
+        "EXECUTE_TEST": "BUILD_DONE"
+      }
+    },
+    "BE_REVIEW_GATE": {
+      "gate": "BE_REVIEW_GATE",
+      "transitions": {
+        "SUCCESS_WITH_UI": "BE_FE_GATE_ON_UI",
+        "SUCCESS_NO_UI": "BUILD_DONE",
+        "FAILURE": "BLOCKED"
+      }
+    },
+    "BE_FE_GATE_ON_UI": {
+      "gate": "BE_FE_GATE_ON_UI",
+      "transitions": {
+        "APPROVE": "BUILD_DONE"
+      }
+    },
+    "BUILD_DONE": {
+      "transitions": {
+        "PROPOSE_DEPLOY": "DEPLOYMENT_GATE",
+        "SKIP_DEPLOY": "COMPLETION_GATE"
+      }
+    },
+    "DEPLOYMENT_GATE": {
+      "gate": "DEPLOYMENT_GATE",
+      "transitions": {
+        "APPROVE": "DEPLOY_RESULT"
+      }
+    },
+    "DEPLOY_RESULT": {
+      "transitions": {
+        "SUCCESS": "COMPLETION_GATE",
+        "FAILURE": "BLOCKED"
+      }
+    },
+    "COMPLETION_GATE": {
+      "gate": "COMPLETION_GATE",
+      "transitions": {
+        "APPROVE": "READY_TO_ARCHIVE"
+      }
+    },
+    "BLOCKED": {
+      "gate": "BLOCKER_RESOLUTION_GATE",
+      "transitions": {
+        "RESUME_BE": "BE_REVIEW_GATE",
+        "RESUME_PATCH": "LOCKED_DECISION",
+        "RESUME_FE": "BUILD_DONE",
+        "ROLLBACK_TO_DESIGN": "DESIGN_NEEDED"
+      }
+    },
+    "READY_TO_ARCHIVE": {}
+  }
+}

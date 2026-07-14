@@ -1,0 +1,56 @@
+stateDiagram-v2
+    [*] --> DESIGN_NEEDED
+
+    DESIGN_NEEDED --> ka_plan: ka-workflow invokes ka-plan
+    ka_plan --> ADR_GATE: route == COMPLEX_MODE
+    ka_plan --> LOCKED_DECISION: route != COMPLEX_MODE
+
+    ADR_GATE --> LOCKED_DECISION: 🛑 user approves ADR
+    ADR_GATE --> DESIGN_NEEDED: user rejects, back to ka-plan
+
+    LOCKED_DECISION --> ka_execute: ka-workflow invokes ka-execute\n(no preset action - reads decisions.json itself)
+
+    state ka_execute {
+        [*] --> ReadHandoff
+        ReadHandoff --> ValidateSchema
+        ValidateSchema --> RiskTierConfirm: 🛑 tier 1-4 confirmation
+        RiskTierConfirm --> RouteToWorker
+        RouteToWorker --> [*]
+    }
+
+    ka_execute --> BE_REVIEW_GATE: action == backend
+    ka_execute --> DEPLOY_RESULT: action == ops
+    ka_execute --> BUILD_DONE: action in [frontend, schema, test]
+
+    BE_REVIEW_GATE --> BE_FE_GATE_ON_UI: 🛑 user approves walkthrough\n(needs UI)
+    BE_REVIEW_GATE --> BUILD_DONE: 🛑 user approves walkthrough\n(no UI needed)
+
+    BE_FE_GATE_ON_UI --> ka_execute: 🛑 approved, ka-execute runs frontend action
+
+    state DEPLOYMENT_GATE_choice <<choice>>
+    BUILD_DONE --> DEPLOYMENT_GATE_choice
+    DEPLOYMENT_GATE_choice --> DEPLOYMENT_GATE: ops action needed
+
+    DEPLOYMENT_GATE --> ka_execute: 🛑 workflow-level approve\n(then ka-execute tier-4 confirm again)
+    ka_execute --> DEPLOY_RESULT
+
+    DEPLOY_RESULT --> COMPLETION_GATE: success
+    DEPLOY_RESULT --> BLOCKED: failure, retries exceeded
+
+    COMPLETION_GATE --> READY_TO_ARCHIVE: 🛑 user confirms completion
+
+    BLOCKED --> ka_execute: user runs --reset-retries\n(max 3x per state)
+    BLOCKED --> DESIGN_NEEDED: 4th failure -\nreturn to ka-plan instead of retrying
+
+    READY_TO_ARCHIVE --> [*]
+
+    note right of ka_execute
+        ka-execute owns all risk-tier
+        confirmation + schema validation.
+        ka-workflow never bypasses this.
+    end note
+
+    note right of BLOCKED
+        Reset cap prevents infinite
+        retry loops (added in 5.0.0).
+    end note

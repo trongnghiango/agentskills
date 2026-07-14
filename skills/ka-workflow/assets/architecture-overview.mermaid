@@ -1,0 +1,36 @@
+flowchart TD
+    User(["User request"]) --> CLAUDEMD{{"CLAUDE.md<br/>always-on Intake Rule"}}
+    CLAUDEMD --> INTAKE["ka-intake<br/>(completeness checklist)"]
+    INTAKE -->|"missing material info"| AskUser{{"🛑 batched<br/>clarifying questions<br/>(max 2 rounds)"}}
+    AskUser --> INTAKE
+    INTAKE -->|"requirement complete"| WF["ka-workflow<br/>(lifecycle orchestrator)"]
+
+    WF -->|"design/re-design<br/>needed"| PLAN["ka-plan<br/>(Socratic design, D1-D5)"]
+    PLAN -->|"locks"| DECISIONS[("decisions.json<br/>execution_hint")]
+
+    WF -->|"build/deploy<br/>stage reached"| EXEC["ka-execute<br/>(risk-tier router)"]
+    DECISIONS -.->|"Step 0: read handoff"| EXEC
+
+    EXEC -->|"action=backend"| BE["ka-be"]
+    EXEC -->|"action=frontend"| FE["ka-fe"]
+    EXEC -->|"action=schema"| DB["ka-db-schema"]
+    EXEC -->|"action=test"| TEST["ka-test"]
+    EXEC -->|"action=ops"| OPS["ka-ops"]
+
+    BE --> WF
+    FE --> WF
+    DB --> WF
+    TEST --> WF
+    OPS --> WF
+
+    WF -->|"gates:<br/>ADR / review / deploy / completion"| Approve{{"🛑 user<br/>confirms"}}
+    Approve --> WF
+
+    style CLAUDEMD fill:#4a5568,color:#fff
+    style INTAKE fill:#805ad5,color:#fff
+    style WF fill:#2d3748,color:#fff
+    style PLAN fill:#2b6cb0,color:#fff
+    style EXEC fill:#2f855a,color:#fff
+    style DECISIONS fill:#744210,color:#fff
+    style Approve fill:#c53030,color:#fff
+    style AskUser fill:#c53030,color:#fff
