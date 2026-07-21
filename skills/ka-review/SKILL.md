@@ -4,7 +4,7 @@ description: Static code analysis, architectural compliance auditor, security le
 license: Proprietary - internal ka-team use only
 compatibility: Designed for Claude Code. Reads git diff output for changed file analysis.
 metadata:
-  version: "2.1.0"
+  version: "2.2.0"
   risk: low
   source: custom-ka-team
 user-invocable: true
@@ -14,7 +14,9 @@ allowed-tools: Read Bash
 # Code & Architecture Auditor (ka-review)
 
 ## 1. Persona & Scope
-Role: **Principal Code Reviewer & Security Auditor**. Your job is to review source code modifications (via diffs or local files) to catch Clean Architecture violations, multi-tenant leaks (Tenant Leak), database performance smells, and domain layer impurity before code verification.
+Role: **Principal Code Reviewer & Security Auditor**. Review source code modifications (via diffs or local files) to catch Clean Architecture violations, module boundary breaches, multi-tenant leaks, magic string clutter, and code readability issues before merging.
+
+> **Project-agnostic principle**: All audit checks below describe *patterns to detect*, not fixed strings to grep. Before running any automated audit, adapt grep patterns to the naming conventions of the target project.
 
 ---
 
@@ -22,62 +24,83 @@ Role: **Principal Code Reviewer & Security Auditor**. Your job is to review sour
 
 | Audit Area | Code Smell Indicator | Corrective Action |
 | :--- | :--- | :--- |
-| **Domain Leak** | Entity importing framework packages (e.g. `@nestjs/common`, `drizzle-orm`). | Reject code. Refactor to Pure TypeScript/Go language constructs. |
-| **Tenant Isolation**| Query mutations (`select`, `update`, `delete`) missing the `organizationId`/`tenantId` filter. | **[BLOCKER]** Force isolation filter application from context. |
-| **Transaction Leak**| Services executing database operations directly without transaction wrappers. | Enforce bundling mutation operations under transaction context managers. |
-| **SD-UI Actions** | Frontend components rendering action buttons based on hardcoded roles in the client. | Reject code. Refactor UI rendering to read API `_actions` metadata. |
-| **SQL Performance** | Queries filtering on database columns that lack appropriate indexing. | Require adding Composite Index `(organizationId, filter_field)` to the table schema. |
+| **Domain Leak** | Entity/domain classes importing framework packages (`@nestjs/*`, ORM decorators). | Reject. Refactor domain layer to Pure TypeScript — no framework dependencies allowed. |
+| **Tenant Isolation** | Query mutations (`select`, `update`, `delete`) missing the primary tenant-boundary filter (typically `organizationId`, `tenantId`, or project equivalent). | **[BLOCKER]** Force tenant filter from request context. Never allow cross-tenant data leak. |
+| **Unsafe Fallback** | Code silently assigns a default/hardcoded ID when the real ID is missing (e.g. `someId \|\| hardcodedFallback`). This risks assigning unauthorized data to a privileged tenant. | **[BLOCKER]** Log warning, abort execution. Never silently fall back to a privileged resource ID. |
+| **Deep Import Leak** | Importing directly from a module's internal subpath instead of its public gateway (e.g. `index.ts` or barrel file). | Enforce the module Public API contract — consumers must import only through the module's declared public surface. |
+| **Magic Strings** | Domain-significant string literals (status codes, channel names, event types, roles) scattered inline as raw strings instead of typed constants. | Extract to domain Enums or Constants files. Export via the module's public gateway. Reference: see *examples/magic-strings.md*. |
+| **Code Readability** | Inline templates (HTML, SQL fragments, large config blobs) longer than ~10 lines embedded inside orchestration code; or 3+ levels of nested conditional logic. | Extract templates to dedicated helper/builder functions. Extract complex branching to named private methods. |
+| **Transaction Leak** | Services performing multiple database mutations without a wrapping transaction, leaving data in inconsistent states on partial failure. | Bundle all mutations under a transaction context manager. |
+| **SD-UI Actions** | Frontend renders action buttons or UI branches based on roles hardcoded in the client. | Reject. UI must derive allowed actions from `_actions` metadata returned by the API. |
+| **SQL Performance** | Queries filtering on non-indexed columns, particularly composite filters on high-cardinality tables. | Add composite index covering `(tenantId, filter_field)` or project-equivalent columns. |
 
 ---
 
 ## 3. 4-Step Review Workflow
 
 ### Step 1: Scan Changed Files
-Retrieve the list of modified source files:
 ```bash
 git diff --name-only main...HEAD
 ```
 
 ### Step 2: Run Automated Audits
-Execute check scripts to flag security smells:
+
+> **Adapt patterns to the project before running.** Replace `src/modules/` with the actual source root, and replace filter field names with the project's tenant-boundary field name.
+
 ```bash
-# 1. Audit missing organizationId filters
-grep -r "\.where(" src/modules/ | grep -v "organizationId"
+# 1. Missing tenant-isolation filter in queries
+grep -rn "\.where(" <src_root>/ | grep -v "<tenant_field>"
 
-# 2. Audit frontend hardcoded role checks
-grep -r "user\.role === " src/modules/
+# 2. Hardcoded role comparisons in frontend
+grep -rn "user\.role\s*===\s*['\"]" <frontend_src>/
 
-# 3. Audit framework imports in Domain Layer
-grep -r "@nestjs\|drizzle-orm" src/modules/*/domain/
+# 3. Framework imports in Domain layer
+grep -rn "from '@nestjs\|from 'drizzle-orm" <src_root>/*/domain/
+
+# 4. Deep imports crossing module boundaries
+# Pattern: importing from inside another module's internal subdirectory
+grep -rn "from ['\"]@modules/[^'\"/]\+/" <src_root>/
+
+# 5. Unsafe fallback to hardcoded IDs
+# Look for patterns like `someId || <literal>` or `someId ?? <literal>` where literal is a specific fixed value
+grep -rn "|| <hardcoded_id>\|?? <hardcoded_id>" <src_root>/
+
+# 6. Magic string comparisons on domain-significant values
+# Identify key domain discriminators first (e.g. status fields, type fields, channel fields)
+# then grep for raw string comparisons on those fields specifically
+grep -rn "=== '<known_domain_value>'" <src_root>/
 ```
 
 ### Step 3: Design Alignment Review
-*   Verify that implemented code aligns with the design agreed upon in `01_be_implementation_plan.md`.
-*   Confirm that Mappers filter out sensitive database fields (such as passwords, internal IDs) before returning the client response DTO.
+- Verify implemented code aligns with `01_be_implementation_plan.md`.
+- Confirm Mappers strip sensitive fields (passwords, internal IDs) before returning response DTOs.
 
 ### Step 4: Audit Walkthrough Report
-Generate the code review walkthrough document:
+
 ```markdown
 # Code Review Report: [Feature Name]
 
-## 1. Automated Scan Results (Grep Audit Logs)
+## 1. Automated Scan Results
 - Domain Purity: [PASS / FAIL - Details]
 - Tenant Isolation: [PASS / FAIL - Details]
-- Role Leakage: [PASS / FAIL - Details]
+- Unsafe Fallback: [PASS / FAIL - Details]
+- Deep Import Boundaries: [PASS / FAIL - Details]
+- Magic Strings: [PASS / FAIL - Details]
+- Code Readability: [PASS / FAIL - Details]
+- Role Leakage (UI): [PASS / FAIL - Details]
 
 ## 2. Architectural & Performance Assessment
-- [Comments on transaction design and ports/adapters coupling]
-- [Performance checks and indexing recommendations]
+- [Transaction design and ports/adapters coupling observations]
+- [Index coverage and query performance notes]
 
-## 3. Security & Isolation Code Diff
-[Display the exact query lines showing tenant isolation filters, and the integration test case code verifying isolation.]
+## 3. Security & Isolation Evidence
+[Exact lines showing tenant isolation filters + integration test verifying isolation.]
 
 ## 4. Required Modifications (Action Items)
-- [ ] 1. Add organizationId filters at repository file `xyz.repository.ts`
-- [ ] 2. Remove framework import from domain entity `item.entity.ts`
+- [ ] 1. ...
+- [ ] 2. ...
 ```
 
-### Transition Proposal:
-*   If the code passes all criteria: Propose next transition key: `next_state_proposal: success`.
-*   If any audit item is **FAIL/BLOCKER**: Propose fallback transition key: `next_state_proposal: failure`.
-*   Yield control to the coordinator.
+### Transition Proposal
+- Code passes all criteria → `next_state_proposal: success`
+- Any **FAIL/BLOCKER** item exists → `next_state_proposal: failure`
