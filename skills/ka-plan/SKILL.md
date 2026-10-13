@@ -1,6 +1,6 @@
 ---
 name: ka-plan
-description: Socratic technical design and architecture facilitator. Challenges assumptions, maps trade-offs between competing approaches, and produces a locked decision handoff for ka-execute. Never writes executable code. Use when the user is uncertain or comparing options (Vietnamese: "tại sao", "nên", "hay là", "có nên", "giải pháp", "so sánh", "trade-off"; English: "approach", "which is better"), wants deep exploration ("phân tích", "explore", "investigate", "overview"), raises cross-module or system-wide impact ("tích hợp", "impact", "toàn hệ thống"), signals unresolved uncertainty ("chưa rõ", "unclear", "depends"), or explicitly asks for a plan/roadmap/strategy ("kế hoạch", "roadmap", "strategy", "workflow"). Do not use for requests with an already-obvious, single, concrete target (e.g. "fix this regex bug") — those should proceed straight to implementation.
+description: "Socratic technical design and architecture facilitator. Challenges assumptions, maps trade-offs between competing approaches, and produces a locked decision handoff for ka-execute. Never writes executable code. Use when the user is uncertain or comparing options (Vietnamese: \"tại sao\", \"nên\", \"hay là\", \"có nên\", \"giải pháp\", \"so sánh\", \"trade-off\"; English: \"approach\", \"which is better\"), wants deep exploration (\"phân tích\", \"explore\", \"investigate\", \"overview\"), raises cross-module or system-wide impact (\"tích hợp\", \"impact\", \"toàn hệ thống\"), signals unresolved uncertainty (\"chưa rõ\", \"unclear\", \"depends\"), or explicitly asks for a plan/roadmap/strategy (\"kế hoạch\", \"roadmap\", \"strategy\", \"workflow\"). Do not use for requests with an already-obvious, single, concrete target (e.g. \"fix this regex bug\") — those should proceed straight to implementation."
 license: Proprietary - internal ka-team use only
 compatibility: Designed for Claude Code. Step D5 runs `node .agents/scripts/state-manager.js`, which requires Node.js and a `.agents/` directory in the repo.
 metadata:
@@ -66,11 +66,17 @@ This is Socratic reasoning, not a form to fill out. Guide the discussion natural
   node .agents/scripts/state-manager.js update --proposal [PROPOSAL_TYPE] --route [MODE] --completed-file docs/context/...
   ```
 
-See `references/handoff-schema.md` for the full `decisions.json` schema (including `execution_hint`, which is what lets `ka-execute` skip re-asking the user for action/options).
+### Fast-Track Mode (Bypass Socratic Questions)
+When `ka-intake` forwards a Fast-Track request (using `templates/fast-track-*.md` or explicit fast-track instructions):
+1. **Skip D1–D3 interactive stops**: Synthesize the core problem, select the industry-standard Clean Architecture solution (referencing `references/global-benchmarks.md`), and map out data flow in 1 single turn.
+2. **Lock `decisions.json` immediately**: Derive `execution_hint` automatically and set `status: "locked"`.
+3. Advance state-manager to execution state and hand off to `ka-execute`.
 
-## 3. STAX stack extension
+## 3. Technology & Architecture Extensions
 
-If the repository is a STAX project (React/TanStack/NestJS/Drizzle stack), load `references/stax-think.md` for stack-specific boundaries and tier rules to flag during design.
+- **One-Way Dependency & Registry Pattern**: Read `references/registry-and-decoupling.md` for strict DAG module boundaries, ADR-011 Registry pattern, and Self-Contained Domain Events (TS, Go, Python).
+- **Global Tech Benchmarks & Steve Jobs Taste**: Read `references/global-benchmarks.md` for Stripe Idempotency, Linear 60fps Optimistic UI, Netflix Circuit Breakers, and YAGNI Anti-Garbage rules.
+- **STAX stack extension**: If the repository is a STAX project (React/TanStack/NestJS/Drizzle stack), load `references/stax-think.md` for stack-specific boundaries and tier rules to flag during design.
 
 ## 4. Diagram
 

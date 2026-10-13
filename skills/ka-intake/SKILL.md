@@ -21,6 +21,31 @@ This is not the same job as `ka-plan`'s D1 Socratic exploration. `ka-plan` chall
 ## When this activates
 Triggered by the always-on Intake Rule in `CLAUDE.md` on every request, before `ka-workflow`/`ka-plan`/`ka-execute` begin work — **not** typed directly (`user-invocable: false`). Skipped only if the request already references a locked `decisions.json` entry (intake was already done for that decision).
 
+## Dual Execution Modes (Socratic vs Fast-Track)
+
+`ka-intake` operates in one of two modes depending on the request nature:
+
+### Mode A: Fast-Track Autonomous Mode (Bypass Questions)
+**Kích hoạt khi**:
+1. User cung cấp một trong các template mẫu từ `templates/` (`fast-track-feature.md`, `fast-track-hotfix.md`, `fast-track-worker.md`, `fast-track-refactor.md`).
+2. User sử dụng các từ khóa gia tốc: *"fast-track"*, *"tự hành"*, *"triển khai nhanh"*, *"bỏ qua phỏng vấn"*, *"không hỏi vòng vo"*, *"làm ngay"*.
+3. Request đã có đủ 5/8 trường cốt lõi và các trường còn lại thuộc nhóm có thể tự suy luận an toàn từ codebase.
+
+**Hành vi trong Fast-Track Mode**:
+- **KHÔNG HỎI BẤT KỲ CÂU NÀO** (Bypass Step 2 batched questions).
+- Tự động điền các giá trị mặc định chuẩn mực dựa trên codebase (convention over configuration).
+- Tóm tắt yêu cầu trong 3 dòng dứt khoát:
+  ```text
+  ⚡ FAST-TRACK ACTIVATED:
+  • Mục tiêu: <Core Goal>
+  • Ranh giới: <In-scope vs Out-of-scope>
+  • Tiêu chuẩn: Clean Architecture 4 tầng + TDD + Single Screen Rule
+  ```
+- Lập tức chuyển sang `ka-plan` (để khóa `decisions.json` trong 1 turn) hoặc `ka-execute` để tự hành 100%.
+
+### Mode B: Socratic Exploration Mode (Phỏng vấn Khai phá)
+**Kích hoạt khi**: Request ngắn gọn, mơ hồ, chưa rõ actor hay mục tiêu nghiệp vụ cốt lõi và KHÔNG bật cờ fast-track. Tiến hành theo Step 1 đến Step 4 bên dưới.
+
 ## Step 1 — Run the checklist
 Check the request against `references/completeness-checklist.md`. For each field, classify as:
 - **Present** — stated explicitly or unambiguously implied by context already in the conversation.

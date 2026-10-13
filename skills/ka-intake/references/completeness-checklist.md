@@ -1,20 +1,32 @@
-# Completeness Checklist
+# Completeness Checklist & Heuristic Decision Matrix
 
-For each request, check these fields. "Material" means: if the AI guessed wrong here, the output would likely be wrong or not what the user wanted — not just cosmetically different.
+Tài liệu này xác định ranh giới giữa: **Bắt buộc phải hỏi** (Material gap), **Tự suy luận an toàn từ codebase** (Codebase deducible), và **Kích hoạt Fast-Track** (Bypass questioning).
 
-| Field | Question it answers | Example: material (must ask) | Example: safe to default (don't ask) |
+---
+
+## 1. BẢNG TIÊU CHÍ ĐÁNH GIÁ 8 TRƯỜNG DỮ LIỆU
+
+| Trường dữ liệu | Bản chất nghiệp vụ | Khi nào BẮT BUỘC hỏi (Material) | Khi nào TỰ SUY LUẬN (Safe to default) |
 |---|---|---|---|
-| **Actor** | Who performs/uses this? | "user báo cáo" — admin hay end-user? Quyền khác nhau hoàn toàn. | Tên biến đại diện actor trong code (`currentUser` vs `user`) |
-| **Trigger** | What starts this flow? | "gửi thông báo" — trigger là action của user, cron job, hay webhook? Kiến trúc khác hẳn. | Format log message khi trigger xảy ra |
-| **Input** | What data comes in, and from where? | "tính tổng đơn hàng" — input là toàn bộ lịch sử hay chỉ đơn active? Sai thì số liệu sai. | Kiểu dữ liệu nội bộ dùng để cộng (int vs decimal) nếu ngôn ngữ đã ép kiểu rõ |
-| **Expected output** | What does "done" produce, in what shape? | "xuất báo cáo" — file Excel, PDF, hay chỉ hiển thị trên UI? | Tên file export mặc định |
-| **Success criteria** | How do we know it worked? | "tối ưu tốc độ" — nhanh hơn bao nhiêu, đo bằng gì? Không có mốc thì không biết khi nào dừng. | Ngưỡng log level để debug |
-| **Edge cases / exceptions** | What happens when input is empty, invalid, or conflicting? | "hủy đơn hàng" — đơn đã giao rồi thì sao? Không hỏi thì dễ code sai luồng nghiệp vụ. | Message lỗi 404 hiển thị tiếng Anh hay tiếng Việt (nếu app đã có convention) |
-| **Constraints** | Performance, security, compliance, budget limits? | "lưu ảnh CMND" — có yêu cầu mã hóa/tuân thủ pháp lý không? Bỏ qua có thể vi phạm luật. | Có nên nén ảnh xuống dưới 500KB nếu không ai yêu cầu cụ thể |
-| **Scope boundary** | What is explicitly *not* included? | "thêm tính năng export" — có bao gồm cả import không? Nhầm scope = làm thừa hoặc thiếu. | Có cần thêm nút "Export" vào cả trang mobile nếu app chỉ có web, chưa có mobile |
+| **1. Actor** | Ai là người thực hiện? | Quyền hạn khác nhau (Admin vs Khách hàng) làm thay đổi logic bảo vệ. | Đã có ngữ cảnh JWT session hoặc module hiện tại chỉ phục vụ 1 role duy nhất. |
+| **2. Trigger** | Cơ chế kích hoạt luồng? | Không rõ là User bấm nút, Cron job chạy nền, hay Webhook đối tác. | Đã chỉ rõ route HTTP REST hoặc component UI cụ thể. |
+| **3. Input** | Dữ liệu đầu vào từ đâu? | Thiếu cấu trúc dữ liệu hoặc không rõ phạm vi truy vấn (All vs Active). | Đã có Zod Schema hoặc DTO hiện hữu trong module. |
+| **4. Expected Output** | Kết quả đầu ra là gì? | Không rõ định dạng (File Excel/PDF hay chỉ là JSON API trả về). | Đã có convention trả lời của API (`{ success, data, error }`). |
+| **5. Success Criteria** | Tiêu chí nghiệm thu? | Yêu cầu định tính mơ hồ ("tối ưu hiệu năng", "làm cho nhanh hơn"). | Yêu cầu định lượng rõ (Unit test pass, lỗi 500 biến mất, trả về 200). |
+| **6. Edge Cases** | Khi lỗi hoặc xung đột? | Luồng nghiệp vụ có trạng thái hủy, hoàn tiền, rớt mạng đối tác. | Lỗi cú pháp validation schema (Zod tự bắt lỗi 400). |
+| **7. Constraints** | Ràng buộc bảo mật/hạ tầng?| Dữ liệu nhạy cảm (mật khẩu, CCCD, khóa bí mật) cần mã hóa. | Quy ước format code, naming conventions theo linter của repo. |
+| **8. Scope Boundary**| Giới hạn phạm vi? | Tính năng lớn dễ phình to (VD: làm Export có kèm Import không?). | Sửa một hàm nhỏ, một component UI đơn lập. |
 
-## How to apply this
+---
 
-1. Go field by field. Most requests will have 5-6 of these already obvious from context (either stated, or unambiguous given the conversation history / existing codebase conventions).
-2. Only the fields that are genuinely material AND missing get asked about — this is usually 1-3 fields per request, not all 8.
-3. If literally everything is present and unambiguous (a well-specified bug fix, a fully-detailed feature request), there is nothing to ask — proceed directly. This checklist is a filter, not a mandatory questionnaire.
+## 2. NGUYÊN TẮC HỎI SOCRATIC THÔNG MINH (ANTI-ANNOYANCE)
+
+Nếu có trường bị thiếu và thực sự thuộc nhóm **Material**:
+1. **Tuyệt đối không hỏi câu hỏi mở chung chung**: Thay vì hỏi *"Bạn muốn xử lý lỗi thế nào?"*, hãy đưa ra phương án trắc nghiệm:
+   ```text
+   🗣️ Để hoàn thiện tính năng [X], cần thống nhất xử lý khi mất mạng:
+   • [A (Recommended)] Ghi nhận vào SQLite Outbox và tự động thử lại ngầm (Offline Resilience).
+   • [B] Báo lỗi ngay lập tức ra màn hình và hủy giao dịch.
+   ```
+2. **Khống chế tối đa 2 vòng hỏi**: Nếu sau 2 vòng vẫn chưa có câu trả lời rõ ràng, Agent **tự chọn phương án Recommended**, ghi chú rõ giả định và tiếp tục làm việc.
+3. **Quy tắc Fast-Track Override**: Nếu request có chứa template điền sẵn hoặc chứa từ khóa `fast-track`, `tự hành`, `làm ngay` $\longrightarrow$ **BỎ QUA 100% CÂU HỎI**, tự áp dụng các giá trị Recommended!
