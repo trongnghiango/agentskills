@@ -25,10 +25,12 @@ Role: **API Contract Architect**. Your task is to define the interface between F
 ---
 
 ## 2. API Contract Guidelines
-*   **Single Source of Truth**: Define API request/response structures once in `openapi.yaml`. Never duplicate schemas manually.
-*   **DTO Validation**: Auto-derive DTO validation schemas from the database schema or mock specs.
-*   **Zod Coercion**: Ensure query/path variables are parsed and coerced (e.g. converting numeric query parameters using `z.coerce.number()`).
-*   **Orval Integration**: Use `orval.config.ts` to output react-query clients (`api-client-react`) and corresponding validation types (`api-zod`) from `openapi.yaml`.
+*   **Single Source of Truth**: Define API request/response structures once via Zod schemas, Pydantic BaseModels, or OpenAPI specs (`references/polyglot-contract-design.md`).
+*   **3-Tier Boundary (Decision D2)**: Public Contracts (Zod/Pydantic DTOs) $\ne$ Internal Application Commands $\ne$ Domain Entities. Public contracts never include hidden internal context (`tenantId` or `actorId`).
+*   **Canonical Response Envelope**: Success: `{ success: true, data: T, meta?: object }`. Flat Error: `{ success: false, statusCode, errorCode, message, errors: [] }`.
+*   **Server-Driven UI (`_actions`)**: Every resource detail/list item must include an `_actions` metadata object (e.g. `{ canApprove, canEdit, canDelete }`) so the frontend doesn't hardcode role logic.
+*   **Strict Parameter Coercion**: Ensure query/path variables are parsed and coerced (e.g. converting numeric query parameters using `z.coerce.number()`).
+*   **Orval & Client Generation**: Use `orval.config.ts` to output react-query clients (`api-client-react`) and corresponding validation types (`api-zod`) from OpenAPI where configured.
 
 ---
 

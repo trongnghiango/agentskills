@@ -115,3 +115,5 @@ Before submitting features, you **MUST** run these checks and paste the actual t
 | 9 | **BFF Domain Leak** | Implement database or business logic in the BFF. | Keep the BFF as a lightweight proxy, transferring token/auth headers. |
 | 10| **Multi-Tenant Safety**| Fetch data without passing `orgId`/`tenantId` to keys/endpoints. | Always embed tenant context into endpoints and React Query keys. |
 | 11| **Scope Creep** | Hack code changes on top of outdated plans when user changes mind. | Stop execution → Go back to Step 1 & 2 → Update plans -> Verify -> Proceed. |
+| 12| **Native Leaks** | Direct import of `@tauri-apps/*` or native APIs in React UI. | Abstract via `platform-service.ts` (Ports/Adapters with Web fallback). |
+| 13| **Optimistic 60fps**| Delaying UI state changes waiting for network round-trips. | Apply React Query optimistic updates with automatic rollback on error. |

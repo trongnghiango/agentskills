@@ -22,11 +22,13 @@ Role: **Database Schema Architect**. Your task is to design the relational persi
 
 ---
 
-## 2. Drizzle ORM Guidelines
-*   **Table Definitions**: Organize code under `lib/db/src/schema/{domain}.ts`.
-*   **Database Enums**: Restrict status/roles using database-level `pgEnum` constraints.
-*   **Relational Integrity**: Declare explicit foreign keys (`.references()`) and relation mapping definitions (`relations()`).
-*   **Composite Indexing**: Always design composite indexes for query patterns. Multi-tenant tables MUST have composite indexes on `(organizationId, search_field)`.
+## 2. Database Schema & Persistence Guidelines
+*   **Polyglot ORM & Relational Design**: Support Drizzle (TS), SQLAlchemy (Python), and raw SQL migrations (Go). See `references/polyglot-schema-guidelines.md`.
+*   **Database Enums**: Restrict status/roles using database-level `pgEnum` or Enum constraints (e.g. `invoice_status`).
+*   **Relational Integrity**: Declare explicit foreign keys (`.references()`) with cascade/restrict rules. No loose unconstrained IDs.
+*   **Query-Driven Composite Indexing**: Always design composite indexes matching exact query patterns. Multi-tenant tables MUST have composite indexes on `(tenantId, status)` and `(tenantId, createdAt)`.
+*   **Financial Immutability**: Prohibit hard deletes on ledger/invoices. Enforce Append-Only audit trails or soft-deletes.
+*   **Zero Schema Drift**: Generate and verify migrations (`pnpm db:check-drift` or migration dry-run) before submitting changes.
 
 ---
 

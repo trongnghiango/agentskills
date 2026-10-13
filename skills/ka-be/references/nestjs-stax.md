@@ -1,42 +1,58 @@
 # STAX-Specific NestJS Extension
 
-> **Auto-loaded** when project is detected as STAX (`@core/shared` in dependencies or `stax` in project name).
+> **Auto-loaded** when project is detected as STAX (`@stax/db` or `@stax/contracts` in dependencies or `stax` in project name).
 > This extends `references/nestjs.md` — do NOT duplicate content already in that file.
 
 ## 1. STAX Module Tier System
 
 | Tier | Characteristics | Examples |
 |---|---|---|
-| **Tier 1 — Foundation** | No business logic, shared across system | `Rbac`, `AuditLog`, `Notification`, `Storage` |
-| **Tier 2 — Domain Core** | Core business entities, DNA of the system | `User`, `Employee`, `OrgStructure` |
-| **Tier 3 — Process Flow** | Business workflows, depends on Tier 2 | `CRM`, `Accounting`, `Contracts` |
+| **Tier 1 — Foundation** | No business logic, shared infrastructure | `Rbac`, `AuditLog`, `Notification`, `System` |
+| **Tier 2 — Domain Core** | Core business entities, DNA of the system | `User`, `Employee`, `OrgStructure`, `Organization` |
+| **Tier 3 — Process Flow** | Business workflows, depends on Tier 2 | `CRM`, `Accounting`, `Contracts`, `Conversation` |
 
-Isolation rule: Tier 2 MUST NOT depend on Tier 3. Cross-module only via Port/Interface or EventBus.
+Isolation rule: Tier 1/2 MUST NOT depend on Tier 3. Cross-module only via Port/Interface or EventBus. Imports across modules MUST go through `index.ts` (no deep imports).
 
 ## 2. STAX Shared Contracts Convention
 
 All Request/Response schemas MUST be defined as Zod schemas at:
 ```
-shared/contracts/{module-name}.contract.ts
+packages/contracts/src/{module-name}/...
 ```
-
-Both Backend and Frontend import from this single source of truth.
+And exported via package `@stax/contracts`.
+Both Backend and Frontend import from `@stax/contracts`. Do NOT import from deprecated `shared/contracts/`.
 
 Example:
 ```typescript
 import { z } from 'zod';
 
-export const CreateLeadSchema = z.object({
+export const createLeadSchema = z.object({
   name: z.string().min(1).max(255),
   email: z.string().email(),
   phone: z.string().optional(),
   source: z.enum(['WEBSITE', 'REFERRAL', 'COLD_CALL']),
 });
 
-export type CreateLeadDto = z.infer<typeof CreateLeadSchema>;
+export type CreateLeadData = z.infer<typeof createLeadSchema>;
 ```
 
-## 3. STAX DI Token Convention
+## 3. STAX Context Boundaries & ID Suffix Standards (ADR-012)
+
+> **STRICT RULE:** NEVER use `tenantId` in Tier 2/3 domain entities!
+- `tenantId`: Platform/system-wide multi-tenancy boundary (AsyncLocalStorage / System Scope).
+- `companyId`: HRM Context (Replaces `tenantId` for employer company in HRM).
+- `clientId`: CRM Context (Replaces `tenantId` for customer client in CRM).
+- `userId`: Login identity.
+- `employeeId`: Internal company staff.
+- `contactId`: Client contact representative.
+- `actorId`: Audit logging only.
+
+## 4. Multi-Tenancy Security & Child Entity Rule
+
+1. **Child Entity Creation:** When creating child entities (`ContractAppendix`, `ContractItem`, `Task`), NEVER use tenant from session/controller payload. Query parent Aggregate Root first, then inherit parent's tenant.
+2. **No Unsafe Fallback:** NEVER use `user.tenantId || 1` for external users → throw `ForbiddenException`.
+
+## 5. STAX DI Token Convention
 
 Always use Symbol tokens, never string tokens or class tokens:
 ```typescript
@@ -48,11 +64,11 @@ export const ILeadRepository = Symbol('ILeadRepository');
 @Inject(DrizzleLeadRepository)  // class token
 ```
 
-## 4. STAX DrizzleBaseRepository
+## 6. STAX DrizzleBaseRepository
 
 All repositories extend `DrizzleBaseRepository` which provides:
 - `getDb(tx?)` — returns transactional or default DB connection
-- `mapToUpdate(data)` — strips immutable fields (id, createdAt) before UPDATE
+- `mapToUpdate(data)` — strips immutable fields (`id`, `createdAt`) before UPDATE
 
 ```typescript
 @Injectable()
@@ -74,35 +90,25 @@ export class DrizzleLeadRepository
 }
 ```
 
-## 5. STAX Transaction Manager (ALS-based)
+## 7. STAX Transaction Manager (ALS-based)
 
 Use `ITransactionManager` with AsyncLocalStorage — never pass `tx` manually through the call stack:
 ```typescript
 @Inject('ITransactionManager') private readonly txManager: ITransactionManager;
 
-async create(dto: CreateLeadDto, orgId: number): Promise<Lead> {
+async create(dto: CreateLeadDto, clientId: number): Promise<Lead> {
   const saved = await this.txManager.runInTransaction(async (tx) => {
-    const entity = new Lead({ ... });
+    const entity = new Lead({ clientId, ...dto });
     return this.repo.save(entity, tx);
   });
-  // Events AFTER transaction
+  // Events AFTER transaction commit
+  this.auditLog.log({ action: 'CREATE', entityType: 'Lead', entityId: saved.id }).catch(() => {});
   await this.eventBus.publish(new LeadCreatedEvent(saved));
   return saved;
 }
 ```
 
-## 6. STAX Audit Log Convention
-
-Always fire-and-forget with `.catch()` — NEVER await inside transaction:
-```typescript
-// ✅ Correct
-this.auditLog.log({ action: 'CREATE', entityType: 'Lead', entityId: saved.id }).catch(() => {});
-
-// ❌ Wrong — blocks transaction, can cause cascade failure
-await this.auditLog.log({ ... });
-```
-
-## 7. STAX Server-Driven UI (_actions)
+## 8. STAX Server-Driven UI (_actions)
 
 Entities that need permission-aware responses must include `_actions` in their Response DTO:
 
@@ -111,7 +117,6 @@ export interface LeadResponseDto {
   id: number;
   name: string;
   status: LeadStatus;
-  // Server-Driven UI
   _actions: {
     canEdit: boolean;
     canDelete: boolean;
@@ -119,91 +124,43 @@ export interface LeadResponseDto {
     canAssign: boolean;
   };
 }
-
-// Computed in the Response Mapper, NOT in Controller
-export class LeadResponseMapper {
-  static toResponse(entity: Lead, userRole: UserRole): LeadResponseDto {
-    return {
-      id: entity.id,
-      name: entity.name,
-      status: entity.status,
-      _actions: {
-        canEdit: entity.status !== 'CONVERTED' && ['ADMIN', 'SALES_MANAGER'].includes(userRole),
-        canDelete: entity.status === 'DRAFT' && userRole === 'ADMIN',
-        canConvert: entity.status === 'QUALIFIED' && ['ADMIN', 'SALES_MANAGER'].includes(userRole),
-        canAssign: ['ADMIN', 'SALES_MANAGER'].includes(userRole),
-      },
-    };
-  }
-}
 ```
 
-## 8. STAX Integration Testing (PGLite)
+## 9. STAX Pre-Deployment Quality Gates (G0-G6)
 
-Use `@electric-sql/pglite` for in-memory PostgreSQL integration tests:
-```typescript
-import { PGlite } from '@electric-sql/pglite';
-
-describe('DrizzleLeadRepository', () => {
-  let db: PGlite;
-  let repo: DrizzleLeadRepository;
-
-  beforeAll(async () => {
-    db = new PGlite();
-    // Run migrations or create tables
-    await db.exec(createTablesSQL);
-    repo = new DrizzleLeadRepository(drizzle(db));
-  });
-
-  afterAll(async () => {
-    await db.close();
-  });
-
-  it('should save and find by id', async () => {
-    const lead = new Lead({ organizationId: 1, name: 'Test Lead', status: 'NEW' });
-    const saved = await repo.save(lead);
-    const found = await repo.findById(saved.id!, 1);
-    expect(found).not.toBeNull();
-    expect(found!.name).toBe('Test Lead');
-  });
-});
-```
-
-## 9. STAX Exit Verification Commands
-
-Run ALL 5 commands and paste results before declaring completion:
+Run ALL required gate commands before declaring completion:
 
 ```bash
-# 1. TypeScript build
-npm run build
-# → Must have 0 errors
+# ── G0: TypeScript, Contracts, DB & Lint ──
+pnpm -F @stax/contracts typecheck
+pnpm -F @stax/db typecheck
+pnpm -F stax-backend check
+pnpm -F stax-backend lint
 
-# 2. Domain purity
-grep -r "@nestjs\|drizzle-orm" src/modules/{module}/domain/
+# ── G1: Unit Tests (SPECIFIC FILE ONLY — NEVER RUN FULL SUITE) ──
+# 🚨 WARNING: Never run 'pnpm -F stax-backend test' (CPU 100% timeout)
+pnpm -F stax-backend test src/modules/<module>/path/to/file.spec.ts
+
+# ── G3: DB Drift Check ──
+pnpm db:check-drift
+
+# ── Domain Purity Check ──
+grep -rn "@nestjs\|drizzle-orm" src/modules/{module}/domain/
 # → Must be empty
 
-# 3. Exception compliance
-grep -r "NotFoundException\|BadRequestException\|ForbiddenException" src/modules/{module}/application/ src/modules/{module}/domain/
-# → Must be empty
-
-# 4. Tenant isolation
-grep -r "\.where(" src/modules/{module}/infrastructure/ | grep -v "organizationId"
-# → Review each line
-
-# 5. Audit log compliance
-grep -r "auditLog\.log" src/modules/{module}/ | grep -v "\.catch"
-# → Must be empty (all auditLog.log must have .catch())
+# ── Exception Compliance Check ──
+grep -rn "NotFoundException\|BadRequestException\|ForbiddenException" src/modules/{module}/application/ src/modules/{module}/domain/
+# → Must be empty (use domain exceptions)
 ```
 
-## 10. STAX File Naming Convention
+## 10. STAX File Naming & 5-Step Workflow (Pattern B)
 
-Document paths follow this structure:
+Document paths follow Pattern B directly at:
 ```
-docs/context/{YYYYMMDD}_{feature_name_snake_case}/
-├── 00_be_analysis.md
-├── 01_be_implementation_plan.md
-├── 02_be_tasks.md
-└── 03_be_walkthrough.md
+docs/STAX/history/{YYYYMMDD}_{feature_name_snake_case}/
+├── analysis.md              # Step 1: Business Analysis & ADR-012
+├── implementation_plan.md   # Step 2: Architecture & Contracts Design
+├── task.md                  # Step 3: Implementation Checklist
+├── test-plan.md             # Step 4: Test Plan (MANDATORY BEFORE CODE)
+└── walkthrough.md           # Step 5: Verification & Gate Results
 ```
-
-After completion, move to `docs/history/{YYYYMMDD}_{feature_name_snake_case}/`.

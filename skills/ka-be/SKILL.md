@@ -69,3 +69,6 @@ You execute steps autonomously based on the `route` provided by the coordinator.
 | 10| **Entity Leak** | Expose Domain properties directly to API responses. | Use DTO Response Mapper to filter properties. |
 | 11| **Audit Log** | Await logs inside database transaction blocks. | Fire-and-forget logging with error catching/suppression. |
 | 12| **Domain Events** | Dispatch domain events during transaction. | Dispatch events only after transaction successfully commits. |
+| 13| **Single Screen** | Methods exceeding 50 lines with deep nesting. | Keep methods $\le 40-50$ lines; Guard Clauses; 5s readability. |
+| 14| **Ghost Code** | Speculative methods/helpers with 0 runtime callers. | Only write code required by the active call graph (YAGNI). |
+| 15| **Anti-Fraud** | Hardcoding conditions (`if id == ...`) or fake records. | Universal algebraic logic; strictly report true discrepancies. |
