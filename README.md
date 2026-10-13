@@ -19,6 +19,44 @@ An agentskills.io-spec-compliant skill set for AI-agent-driven development, cove
 
 ---
 
+## 🌟 Key Upgrades & Core Capabilities (Universal Engineering)
+
+1. **Polyglot Clean Architecture (TS, Go, Python)**:
+   - Unified 4-tier Clean Architecture mapping across TypeScript (NestJS, React, Tauri), Golang (CQRS, Worker Pools), and Python (FastAPI, Hexagonal, SQLite WAL Outbox).
+   - Core standards maintained in `standards/UNIVERSAL_CLEAN_STANDARD.md`.
+
+2. **One-Way Dependency & Registry Pattern (ADR-011)**:
+   - Strict DAG module boundaries: Tier 1 (Foundation) ➔ Tier 2 (Domain Core) ➔ Tier 3 (Process Flow).
+   - Zero circular dependencies: total ban on `forwardRef()`. Cross-module decoupled via **Registry Pattern** and **Domain Events with Self-Contained Payloads** (`standards/ONE_WAY_REGISTRY_STANDARD.md`).
+
+3. **Fast-Track Autonomous Execution (No Conversational Loops)**:
+   - When speed is critical, bypass iterative questioning using pre-packaged spec templates in `skills/ka-intake/templates/`:
+     - `fast-track-feature.md`: New features with domain invariants & FSM.
+     - `fast-track-hotfix.md`: Root-Cause-First 5-step emergency fixes.
+     - `fast-track-worker.md`: Resilient async queues, circuit breakers, offline buffers.
+     - `fast-track-refactor.md`: Clean architecture restructuring & cycle breaking.
+
+4. **Interactive E2E Visual Screenshot Testing**:
+   - Automated 4-stage visual verification (`artifacts/screenshots/`):
+     - `Stage 1`: Initial / Empty State.
+     - `Stage 2`: In-flight / Loading & Disabled Button State.
+     - `Stage 3`: Success State & Toast notifications.
+     - `Stage 4`: Error Banner & Recovery State.
+   - Generates visual Markdown reports with embedded screenshot paths (`skills/ka-test/references/visual-screenshot-testing.md`).
+
+5. **Smart Deployment & Anti-Bottleneck Node Architecture**:
+   - Node separation (API BFF vs Async Worker Nodes).
+   - DB Connection Pool formula: $Pool \le (MaxConn \times 0.8) / Instances$ + PgBouncer.
+   - Worker concurrency formulas for CPU-bound vs I/O-bound jobs.
+   - Zero-Downtime rolling updates with Readiness/Liveness Probes and Graceful Shutdown drains (`skills/ka-ops/references/anti-bottleneck-deployment.md`).
+
+6. **Anti-AI Garbage & Ghost Code Gatekeeper**:
+   - Enforces active call-graph reference checks (knip/ts-prune/vulture): bans code with 0 runtime callers.
+   - Single Screen Viewport Rule: $\le 40-50$ lines/function, $\le 2$ levels of nesting.
+   - Anti-Fraud: Zero hardcoded reconciliation (`if id == ...`), algebraic formulas only (`standards/ANTI_AI_GARBAGE_CODE.md`).
+
+---
+
 ## Why `ka-intake` isn't "just another skill"
 
 Skills only load when their `description` matches the request — there is no frontmatter field that makes a skill unconditionally active. The one thing that *is* unconditional is `CLAUDE.md`. So the "always ask before assuming" behavior is split across two layers:

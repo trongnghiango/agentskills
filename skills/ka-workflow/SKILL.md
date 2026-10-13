@@ -56,6 +56,13 @@ Full descriptions, including the `DEPLOYMENT_GATE` double-confirmation rationale
 1. **Self-Healing Loop**: on a verification failure from `ka-execute`, propose transition key `failure`; `state-manager.js` tracks retries per-state and moves to `BLOCKED` once the limit is exceeded (see `BLOCKER_RESOLUTION_GATE`). Halt, report the error, wait for manual resolution.
 2. **Drift Warning**: if an agent violates directories, skips planning, or writes outside approved specs, stop immediately and output the Drift Detected alert. Treat this like `BLOCKED` — do not resume without explicit user direction.
 
+## 6. DSH Autonomous Native Protocol (Zero-Babysitting Mode)
+When running inside DeepSeek Harness (DSH):
+1. **Goal Engine Integration**: If a long-running feature is requested, initialize a persistent session goal via `create_goal` with `max_goal_rounds` (e.g. 20–30) to allow automatic continuation rounds across lifecycle gates.
+2. **Todo Synchronization**: Maintain live status in `todo_write`. Keep exactly 1 concrete task `in_progress` at any time; mark `completed` immediately upon verification pass.
+3. **Adversarial Gate Auditing via Subagents**: Before passing the review gate, fork an independent subagent with `ka-review` to ruthlessly audit domain purity, single-screen compliance (≤50 lines), and ghost code.
+4. **Fast-Track Auto Advance**: In Fast-Track Mode (templates provided), internal sub-gates advance automatically if all automated verification checks (Unit + Integration + Visual Screenshot + Typecheck) succeed without errors.
+
 ## References
 - `references/gates.md` — full gate descriptions, including retry caps and the deploy double-confirmation rationale.
 - `assets/architecture-overview.mermaid` — how `ka-workflow`, `ka-plan`, and `ka-execute` relate.

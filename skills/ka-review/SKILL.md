@@ -33,6 +33,10 @@ Role: **Principal Code Reviewer & Security Auditor**. Review source code modific
 | **Transaction Leak** | Services performing multiple database mutations without a wrapping transaction, leaving data in inconsistent states on partial failure. | Bundle all mutations under a transaction context manager. |
 | **SD-UI Actions** | Frontend renders action buttons or UI branches based on roles hardcoded in the client. | Reject. UI must derive allowed actions from `_actions` metadata returned by the API. |
 | **SQL Performance** | Queries filtering on non-indexed columns, particularly composite filters on high-cardinality tables. | Add composite index covering `(tenantId, filter_field)` or project-equivalent columns. |
+| **Ghost Code (Clean Garbage)** | Methods/helpers created with 0 references in active runtime call graph (only called in tests or never called). Violated YAGNI. | **[BLOCKER]** Delete speculative code. Every function must serve an active runtime workflow. |
+| **Single Screen Violation** | Functions exceeding 50 lines or containing > 2 levels of nested conditional branches. | **[BLOCKER]** Refactor: Guard Clauses (Early Return), Orchestrator $\le 20$ lines, Private helpers $\le 30$ lines. |
+| **Circular Dependency** | Modules importing each other in a loop, or using `forwardRef()` to patch cycles. | **[BLOCKER]** Break cycle using Domain Events (EventBus with Self-Contained Payload) or Registry Pattern (ADR-011). |
+| **Anti-Fraud Violation** | Hardcoding conditions (`if (code === '...')`, `if (month === 8)`) or fake accrual records to force numbers to match. | **[BLOCKER]** Strictly prohibit surface matching. Use algebraic formulas and report true discrepancies. |
 
 ---
 
@@ -69,11 +73,24 @@ grep -rn "|| <hardcoded_id>\|?? <hardcoded_id>" <src_root>/
 # Identify key domain discriminators first (e.g. status fields, type fields, channel fields)
 # then grep for raw string comparisons on those fields specifically
 grep -rn "=== '<known_domain_value>'" <src_root>/
+
+# 7. Circular dependency & forwardRef() scan
+grep -rn "forwardRef" <src_root>/
+
+# 8. Ghost Code & Dead Code scan (Zero reference check)
+# TypeScript:
+npx knip --production 2>/dev/null || npx ts-prune 2>/dev/null
+# Python:
+vulture <src_root>/ --min-confidence 80 2>/dev/null
+
+# 9. Anti-Fraud & Hardcoded Reconciliation checks
+grep -rnE "if\s*\([^)]*===\s*['\"][0-9A-Z_-]+['\"]\)" <src_root>/*/domain/
 ```
 
 ### Step 3: Design Alignment Review
 - Verify implemented code aligns with `01_be_implementation_plan.md`.
 - Confirm Mappers strip sensitive fields (passwords, internal IDs) before returning response DTOs.
+- Confirm every new public function has an active caller in the runtime workflow (No Ghost Code).
 
 ### Step 4: Audit Walkthrough Report
 
@@ -85,6 +102,10 @@ grep -rn "=== '<known_domain_value>'" <src_root>/
 - Tenant Isolation: [PASS / FAIL - Details]
 - Unsafe Fallback: [PASS / FAIL - Details]
 - Deep Import Boundaries: [PASS / FAIL - Details]
+- Circular Dependency & forwardRef: [PASS / FAIL - Details]
+- Ghost Code & Dead Exports: [PASS / FAIL - Details]
+- Single Screen Rule (≤50 lines): [PASS / FAIL - Details]
+- Anti-Fraud & Algebraic Purity: [PASS / FAIL - Details]
 - Magic Strings: [PASS / FAIL - Details]
 - Code Readability: [PASS / FAIL - Details]
 - Role Leakage (UI): [PASS / FAIL - Details]

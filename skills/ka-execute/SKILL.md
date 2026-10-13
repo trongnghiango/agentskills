@@ -21,7 +21,9 @@ Dispatches `ka-plan` outcomes, or a directly-specified action, to the appropriat
 Look for the most recent `.agents/memory/decisions.json` entry where `status == "locked"` and no `consumed_at` field is present.
 
 - **Not found** → proceed to Step 1 as normal.
-- **Found** → present it:
+- **Found** → 
+  - *Fast-Track Autonomous Mode* (khi `decision.fast_track == true` hoặc đang chạy trong active DSH goal): Tự động adopt `action`/`options`/`risk_tier` và chuyển thẳng sang Step 4b/Step 6 mà không cần hỏi lại.
+  - *Interactive Mode*: present it:
 ```
 🗣️ Tìm thấy quyết định đã chốt từ ka-plan:
 "<decision.summary>"

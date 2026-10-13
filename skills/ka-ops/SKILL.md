@@ -21,6 +21,7 @@ Role: **Principal DevOps & Site Reliability Engineer**. Your job is to container
 ## 2. Infrastructure & Packaging Standards
 *   **Docker Multi-stage Builds**: Always configure multi-stage Dockerfiles to minimize production image size and prevent build-time secrets from leaking into layers.
 *   **Kubernetes Pod Security**: Do not run containers as `root`. Define `securityContext` settings to enforce minimum capabilities (Least Privilege).
+*   **Anti-Bottleneck Node Architecture**: Prevent node clogging by separating API Nodes vs Async Worker Nodes. Tune DB connection pools ($Pool \le MaxConn \times 0.8 / Nodes$), size worker concurrency based on CPU cores, and enforce Readiness/Liveness Probes with Graceful Shutdown (see `references/anti-bottleneck-deployment.md`).
 *   **CI/CD Pipeline Gates**: Automated pipelines must execute: Compilation ➔ Linter analysis ➔ Test Suite execution ➔ Secrets scanning ➔ Build Docker Image.
 
 ---

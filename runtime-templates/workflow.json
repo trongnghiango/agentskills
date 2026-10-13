@@ -3,6 +3,7 @@
   "states": {
     "DESIGN_NEEDED": {
       "transitions": {
+        "PLAN_FAST_TRACK": "LOCKED_DECISION",
         "PLAN_COMPLEX": "ADR_GATE",
         "PLAN_STANDARD": "LOCKED_DECISION",
         "PLAN_PATCH": "LOCKED_DECISION",

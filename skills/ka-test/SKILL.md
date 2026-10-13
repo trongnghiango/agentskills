@@ -32,6 +32,14 @@ Every test suite must verify these critical boundary conditions:
 *   **Tenant Leak Attack**: Emulate an IDOR attack by querying database assets using a valid user ID but bound to an unauthorized `organizationId`, asserting that queries throw authorization errors or return empty results.
 *   **State Machine Violations**: Attempt to invoke state transitions out of sequence (e.g., trying to approve a draft order that is not in the pending state) to confirm that Domain Entities throw validation exceptions.
 
+### C. Interactive E2E & Visual Screenshot Testing Pipeline
+For all interactive UI features, implement automated visual testing following `references/visual-screenshot-testing.md`:
+*   **Stage 1 (Empty)**: Capture initial empty state without errors.
+*   **Stage 2 (Loading)**: Capture in-flight/disabled button interaction.
+*   **Stage 3 (Success)**: Capture populated table/view with success feedback.
+*   **Stage 4 (Error)**: Capture error banner and recovery controls.
+*   **Visual Acceptance Report**: Export Markdown report with embedded screenshot paths (`artifacts/screenshots/...`).
+
 ---
 
 ## 3. Database Integration Test Blueprint (Drizzle + PGLite)

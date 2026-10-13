@@ -40,7 +40,7 @@ Each action's `options` JSON is validated at Step 4b **before** routing. Reject 
     "required": ["target"],
     "properties": {
       "target": { "type": "string", "description": "module/feature under test, e.g. 'auth'" },
-      "test_type": { "type": "string", "enum": ["unit", "integration", "e2e"], "required": false }
+      "test_type": { "type": "string", "enum": ["unit", "integration", "e2e", "visual"], "required": false }
     }
   },
   "ops": {
