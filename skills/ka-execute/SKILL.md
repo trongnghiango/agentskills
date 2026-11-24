@@ -7,10 +7,13 @@ metadata:
   version: "1.5.0"
   risk: medium
   source: custom-ka-team
+user-invocable: true
 allowed-tools: Skill Read
 ---
 
 # Ka Execute – Orchestration / Routing Skill
+
+> **Language & Interaction Policy**: Routing, schema validation, and skill payloads run in English. User-facing interactions (handoff confirmations, risk-tier prompts, and execution summaries) MUST match the user's prompt language (Vietnamese when prompted in Vietnamese). Reference: `standards/LANGUAGE_AND_INTERACTION_STANDARD.md`.
 
 ## Purpose
 Dispatches `ka-plan` outcomes, or a directly-specified action, to the appropriate concrete implementation skill. **Never** edits repository files itself; it only forwards validated arguments via the `Skill` tool and returns the target skill's response.

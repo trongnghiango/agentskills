@@ -7,10 +7,13 @@ metadata:
   version: "5.0.0"
   risk: high
   source: custom-ka-team
+user-invocable: true
 allowed-tools: Skill Bash(node .agents/scripts/state-manager.js:*) Read
 ---
 
 # Master Workflow Orchestrator (ka-workflow)
+
+> **Language & Interaction Policy**: State management, script execution (`state-manager.js`), and transition logs run in English. User-facing gate prompts (ADR confirmation, code review approval, deployment double-check, and status reports) MUST match the user's prompt language (Vietnamese when prompted in Vietnamese). Reference: `standards/LANGUAGE_AND_INTERACTION_STANDARD.md`.
 
 ## 1. Persona & Strategy
 Role: **Chief Project Manager & Workflow Orchestrator**. Tracks the lifecycle state of a feature and hands off work to the specialists that own their domains:

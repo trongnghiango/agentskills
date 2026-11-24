@@ -1,8 +1,20 @@
 ---
 name: ka-handoff
 description: Compact the current conversation into a handoff document for another agent to pick up.
+license: Proprietary - internal ka-team use only
+compatibility: Designed for Claude Code. Generates handoff markdown documentation in docs/handoff/.
+metadata:
+  version: "1.1.0"
+  risk: low
+  source: custom-ka-team
+user-invocable: true
 argument-hint: "What will the next session be used for?"
+allowed-tools: Write Read Bash(git:*)
 ---
+
+# Context Handoff (ka-handoff)
+
+> **Language & Interaction Policy**: Internal analysis and git commands run in English. If the user initiates handoff in Vietnamese, provide the conversational summary and confirmation in Vietnamese, while technical fields in the markdown handoff remain in English.
 
 ## Output location
 

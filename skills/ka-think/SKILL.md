@@ -1,11 +1,19 @@
 ---
 name: ka-think
-description: "General-purpose technical thinking skill. Guides users through structured questioning, design, and architecture decisions without generating implementation code."
+description: General-purpose technical thinking skill. Guides users through structured questioning, design, and architecture decisions without generating implementation code.
+license: Proprietary - internal ka-team use only
+compatibility: Designed for Claude Code. Works across all project types without repository side-effects.
+metadata:
+  version: "2.1.0"
+  risk: low
+  source: custom-ka-team
 user-invocable: true
-version: "2.1.0"
+allowed-tools: Read
 ---
 
 # Ka Think – General Technical Reasoning
+
+> **Language & Interaction Policy**: Internal reasoning, planning, and evaluation operate strictly in English. User-facing interactions (Socratic questions, architecture summaries, and options) MUST match the language of the user's prompt (defaulting to Vietnamese when the user prompts in Vietnamese). Reference: `standards/LANGUAGE_AND_INTERACTION_STANDARD.md`.
 
 ## 1. Purpose & Scope
 

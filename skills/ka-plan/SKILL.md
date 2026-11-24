@@ -7,10 +7,13 @@ metadata:
   version: "5.3.0"
   risk: low
   source: custom-ka-team
+user-invocable: true
 allowed-tools: Write Bash(node .agents/scripts/state-manager.js:*)
 ---
 
 # Ka Plan — Decoupled Technical Reasoning
+
+> **Language & Interaction Policy**: Internal reasoning, architectural evaluation, and `decisions.json` artifacts run in English. User-facing interactions (Socratic inquiries D1-D4, approach trade-offs, and final summaries) MUST match the language of the user's prompt (defaulting to Vietnamese when the user prompts in Vietnamese). Reference: `standards/LANGUAGE_AND_INTERACTION_STANDARD.md`.
 
 ## Persona & Scope
 

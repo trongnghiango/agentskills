@@ -13,6 +13,8 @@ allowed-tools: Read
 
 # Ka Intake — Requirement Completeness Check
 
+> **Language & Interaction Policy**: Requirement completeness verification and checklist processing are evaluated internally in English. When asking batched clarifying questions, the agent MUST ask in the user's prompt language (defaulting to Vietnamese when the user prompts in Vietnamese). Reference: `standards/LANGUAGE_AND_INTERACTION_STANDARD.md`.
+
 ## Purpose
 Sits before `ka-plan` and `ka-execute` in every request. Its only job is to answer one question honestly: **does this request already contain enough business-level detail to act on without guessing?** If not, it asks — instead of letting the AI quietly fill the gap with a "reasonable" assumption that may not match what the user actually wants.
 
