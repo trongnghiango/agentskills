@@ -20,6 +20,12 @@ Written by `ka-plan` at Step D5, consumed by `ka-execute` at its Step 0. This fi
     "rejected_approaches": ["<option A>", "<option B>"],
     "tradeoffs_accepted": "<the trade-off the user explicitly agreed to in D3>"
   },
+  "test_plan": {
+    "strategy": "TDD | test-first for bug fix | characterization first",
+    "levels": ["unit", "integration"],
+    "cases": ["<behavior> — <level> — <RED case đầu tiên>"],
+    "coverage_target": "<vd: domain 80% branch>"
+  },
   "execution_hint": {
     "action": "backend | frontend | schema | test | ops",
     "options": { "...": "action-specific payload — see ka-execute/references/option-schemas.md for the exact shape each action expects" },
@@ -32,6 +38,15 @@ Written by `ka-plan` at Step D5, consumed by `ka-execute` at its Step 0. This fi
 
 - Only write `"status": "locked"` after the user has explicitly confirmed the D3 trade-off choice. A decision inferred by `ka-plan` alone, without that confirmation, must not be locked.
 - `consumed_at` is added later, by `ka-execute`, once the handoff has been used — `ka-plan` never sets this field itself.
+
+## `test_plan` (bắt buộc)
+
+`test_plan` không được để trống. Nó trả lời: hành vi nào được test ở tầng nào, case RED đầu tiên là gì, ngưỡng coverage áp cho layer nào.
+
+- Feature mới → `strategy: "TDD"`, `cases` phải có case RED đầu tiên.
+- Bug fix → `strategy: "test-first for bug fix"`, `cases` phải có test tái hiện bug.
+- Code cũ chưa có test → `strategy: "characterization first"`.
+- Không có test plan → `ka-plan` không được set `status: "locked"`.
 
 ## Deriving `execution_hint`
 

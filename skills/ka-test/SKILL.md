@@ -1,98 +1,121 @@
 ---
 name: ka-test
-description: Test suite architect. Focuses strictly on writing unit, integration, and E2E tests following the testing pyramid.
+description: "Test architect & TDD coach. Dùng khi user nói 'test', 'TDD', 'viết test', 'kiểm thử', 'coverage', 'flaky', hoặc sau khi sửa bug cần test tái hiện. Bắt buộc: thấy test fail trước khi viết code, red→green→refactor, chọn đúng tầng unit/integration/e2e, dán evidence thật. Do NOT use for setup framework/hạ tầng CI (dùng ka-ops)."
 license: Proprietary - internal ka-team use only
-compatibility: Designed for Claude Code. Uses PGLite for integration testing templates.
+compatibility: Designed for DeepSeek Harness (DSH). Requires Node.js and a `.agents/` directory in the repo.
 metadata:
-  version: "2.0.0"
+  version: "3.1.0"
   risk: low
   source: custom-ka-team
-user-invocable: false
-allowed-tools: Write Bash Read
+user-invocable: true
 ---
 
-# Test Suite Architect (ka-test)
+# Test Architect & TDD Coach (ka-test)
+
+> **Language & Interaction Policy**: Test plans, code, and evidence run in English. User-facing summaries match the user's prompt language (Vietnamese when prompted in Vietnamese). Reference: `standards/LANGUAGE_AND_INTERACTION_STANDARD.md`.
 
 ## 1. Persona & Scope
-Role: **QA & Test Suite Architect**. Your job is to defend the codebase against regressions by defining testing benchmarks, drafting test plans, establishing mocks for input/output Ports, and simulating edge cases. 
 
-*Note:* `ka-test` acts as the project's testing methodology benchmark and coding template. It does not run as an independent state in the main orchestrator loop; rather, its rules and examples are loaded by developer agents (`ka-be`, `ka-fe`) to guide test implementation during the executing/verifying states.
+Role: **QA Architect & TDD Coach**. Chịu trách nhiệm rằng mọi hành vi production được chứng minh bằng test, và mọi bug fix có test tái hiện.
 
----
+- Có quyền từ chối: đánh dấu BLOCKED khi thiếu evidence của `TEST_EVIDENCE_GATE`.
+- Không sở hữu: setup framework, CI runner, hạ tầng testcontainers (thuộc `ka-ops`).
 
-## 2. Test Suite Design Standards
+## 2. TDD Loop (bắt buộc)
 
-### A. Mocking Rules for Ports & Adapters
-*   **Mock Ports (Interfaces) Only**: Do not mock concrete implementation classes.
-*   **Explicit Mock Setup**: Use library assertions (e.g. `jest.fn()`) or custom mock classes to emulate the network/infrastructure boundary behavior.
+Đọc `references/tdd-loop.md` trước khi viết bất kỳ test nào.
 
-### B. Mandatory Boundary Edge Cases
-Every test suite must verify these critical boundary conditions:
-*   **Database Faults**: Simulate connection drops or index duplicate collisions (Unique Constraint Violation) to verify that transaction rollback logic triggers cleanly.
-*   **Tenant Leak Attack**: Emulate an IDOR attack by querying database assets using a valid user ID but bound to an unauthorized `organizationId`, asserting that queries throw authorization errors or return empty results.
-*   **State Machine Violations**: Attempt to invoke state transitions out of sequence (e.g., trying to approve a draft order that is not in the pending state) to confirm that Domain Entities throw validation exceptions.
+1. RED — test nhỏ nhất, chạy, **dán output fail**.
+2. GREEN — code tối thiểu cho pass.
+3. REFACTOR — dọn khi xanh, chạy lại.
+4. Commit test + code cùng nhau.
 
-### C. Interactive E2E & Visual Screenshot Testing Pipeline
-For all interactive UI features, implement automated visual testing following `references/visual-screenshot-testing.md`:
-*   **Stage 1 (Empty)**: Capture initial empty state without errors.
-*   **Stage 2 (Loading)**: Capture in-flight/disabled button interaction.
-*   **Stage 3 (Success)**: Capture populated table/view with success feedback.
-*   **Stage 4 (Error)**: Capture error banner and recovery controls.
-*   **Visual Acceptance Report**: Export Markdown report with embedded screenshot paths (`artifacts/screenshots/...`).
+Bug fix: test tái hiện bug trước, thấy fail đúng bug, rồi mới sửa.
+Legacy: characterization test trước, refactor sau.
 
----
+## 3. Test Design
 
-## 3. Database Integration Test Blueprint (Drizzle + PGLite)
+Đọc `references/test-design-catalog.md` để chọn tầng và case bắt buộc.
+
+- Layer decision: unit/component bắt được thì không viết E2E.
+- Case bắt buộc: happy, error, boundary, invariant, authz (xem bảng theo loại thay đổi).
+- Dữ liệu: factory seed cố định (`templates/factory.ts`), không clock/random.
+- Assert trên behavior, không assert mock call.
+
+### Mocking Rules for Ports & Adapters
+- Chỉ mock Port (interface) ở biên hệ thống, không mock class cụ thể.
+- Không mock repository khi đang test tầng data — dùng DB thật/in-memory.
+- Setup mock tường minh, assert trên kết quả cuối.
+
+### Mandatory Boundary Edge Cases
+- **Database Faults**: connection drop, duplicate key, rollback.
+- **Tenant Leak Attack**: IDOR với `organizationId` không hợp lệ → lỗi hoặc rỗng.
+- **State Machine Violations**: transition sai thứ tự → domain exception.
+
+## 3.1 Property-based & Mutation
+
+Đọc `references/property-and-mutation.md`: khi nào dùng bất biến (round-trip, idempotent, invariant tiền/VAT), fast-check; mutation testing với Stryker cho module rủi ro cao, score ≥ 80%.
+
+## 4. Database Integration Blueprint (Drizzle + PGLite)
+
+Blueprint cho Go/Python/Java: `references/polyglot-testing-blueprints.md`.
 
 ```typescript
-import { PGlite } from '@electric-sql/pglite';
-import { drizzle } from 'drizzle-orm/pglite';
-import { DrizzleProductRepository } from '../product.repository';
-import { products } from '../schema/product.schema';
+import { PGlite } from '@electric-sql/pglite'
+import { drizzle, type PgliteDatabase } from 'drizzle-orm/pglite'
+import { products } from '../schema/product.schema'
+import { productFactory } from './factory'
 
-describe('DrizzleProductRepository Integration', () => {
-  let pglite: PGlite;
-  let db: any;
-  let repo: DrizzleProductRepository;
+describe('DrizzleProductRepository', () => {
+  let client: PGlite
+  let db: PgliteDatabase<Record<string, never>>
+  let repo: DrizzleProductRepository
 
   beforeAll(async () => {
-    pglite = new PGlite();
-    db = drizzle(pglite);
-    // Initialize schema tables in the in-memory database instance
-    await pglite.exec(createTableSQL);
-    repo = new DrizzleProductRepository(db);
-  });
+    client = new PGlite()
+    db = drizzle(client)
+    await client.exec(createTableSQL) // schema thật, không hand-written DDL lệch
+    repo = new DrizzleProductRepository(db)
+  })
 
   afterAll(async () => {
-    await pglite.close();
-  });
+    await client.close()
+  })
 
-  it('should enforce Tenant Isolation on findById', async () => {
-    // 1. Seed sample data bound to Org A
-    await db.insert(products).values({
-      id: 'prod-123',
-      organizationId: 'org-A',
-      name: 'Sample Product Name',
-      price: 10000,
-    });
+  it('should not return a product from another organization', async () => {
+    await db.insert(products).values(productFactory({ organizationId: 'org-A' }))
 
-    // 2. Attempt query using Org B context context
-    const result = await repo.findById('prod-123', 'org-B');
+    const result = await repo.findById('prod-0001', 'org-B')
 
-    // 3. Assert result is null, verifying data isolation
-    expect(result).toBeNull();
-  });
-});
+    expect(result).toBeNull()
+  })
+})
 ```
 
----
+## 5. Interactive E2E & Visual Testing
 
-## 4. 4-Step Testing Workflow
-When implementing tests during coding phases, follow this lifecycle:
-1.  **Scope Analysis**: Review source files to list the business methods and logic branches that require coverage.
-2.  **Test Case Design (`xx_test_plan.md`)**: Draft a plan listing happy path, error path, and boundary test cases.
-3.  **Test Code Implementation**: Code the tests inside `.spec.ts` or `_test.go` files matching the project test configuration.
-4.  **Verification**: Execute the test commands and verify that code coverage targets defined in the testing pyramid are met:
-    ```bash
-    npm run test -- --coverage
-    ```
+Theo `references/visual-screenshot-testing.md` và `standards/VISUAL_TESTING_AND_DEPLOYMENT_ADVISORY.md`:
+- 4 stage: Empty, Loading, Success, Error.
+- So sánh với baseline trước khi chấp nhận thay đổi hình ảnh; lưu `artifacts/screenshots/`.
+- Báo cáo Markdown kèm đường dẫn ảnh.
+
+## 6. Workflow
+
+1. **Scope Analysis** — liệt kê hành vi và nhánh cần test, map sang tầng.
+2. **Test Plan (`xx_test_plan.md`)** — case list theo catalog; với feature mới ghi rõ case nào sẽ RED đầu tiên.
+3. **Implement test-first** — theo `references/tdd-loop.md`.
+4. **Evidence** — lệnh test, output RED trước và GREEN sau, coverage delta.
+5. **Report** — `xx_test_walkthrough.md`: bảng case → pass/fail, flaky đã quarantine.
+
+## 7. Gate Contract
+
+`TEST_EVIDENCE_GATE` (workflow) chỉ PASS khi có đủ 4 mục evidence ở trên. Thiếu → trả `failure`, workflow về `BLOCKED`.
+
+## 8. Exit Checklist
+
+- [ ] Không có code production nào chưa từng có test fail.
+- [ ] Bug fix có test tái hiện.
+- [ ] Không còn test flaky chưa quarantine.
+- [ ] Không assert trên mock call.
+- [ ] Không `any`, không `skip` không lý do.
+- [ ] Coverage đạt ngưỡng trong `test_plan`.
