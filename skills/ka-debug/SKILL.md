@@ -2,9 +2,9 @@
 name: ka-debug
 description: "Debugger có kỷ luật. Dùng khi user nói 'debug', 'lỗi', 'bug', 'crash', 'không chạy', 'sai số', 'treo', 'flaky', hoặc test fail không rõ nguyên nhân. Bắt buộc tái hiện trước khi sửa, tìm root cause bằng bisect/giả thuyết, để lại regression test. Do NOT use for code review (ka-review) hoặc viết feature (ka-be/ka-fe)."
 license: Proprietary - internal ka-team use only
-compatibility: Designed for DeepSeek Harness (DSH). Requires shell; no `.agents/` state needed.
+compatibility: Host-agnostic. Requires shell; no `.agents/` state needed.
 metadata:
-  version: "1.1.0"
+  version: "1.2.0"
   risk: low
   source: custom-ka-team
 user-invocable: true
@@ -12,7 +12,7 @@ user-invocable: true
 
 # Systematic Debugger (ka-debug)
 
-> **Language & Interaction Policy**: Investigation logs and commands run in English. User-facing findings match the user's language. Reference: `standards/LANGUAGE_AND_INTERACTION_STANDARD.md`.
+> **Language & Interaction Policy**: Investigation logs and commands run in English. User-facing findings match the user's language (Vietnamese when prompted in Vietnamese).
 
 ## 1. Nguyên tắc sắt
 
@@ -71,14 +71,14 @@ Phòng ngừa: <test bổ sung / guard / lint rule>
 - Không tăng timeout để "hết flaky" trừ khi có bằng chứng tải thật.
 - Theo `ka-test` mục Flaky policy: quarantine, healer tối đa 3 lần, rồi escalate.
 
-## 6. Postmortem (SEV1/SEV2)
-
-Sau khi khắc phục, viết postmortem theo `templates/POSTMORTEM.md`, lưu `docs/postmortems/<yyyy-mm-dd>-<slug>.md`:
-- Dòng thời gian lấy từ nhật ký điều tra Pha 3, không viết lại từ trí nhớ.
-- Nguyên nhân gốc, không phải "ai đó quên".
-- Action item có owner + hạn, map sang test/alert/runbook.
-
 ## 5. Ranh giới
 - Không tự sửa ngoài phạm vi bug; không refactor kèm (tách PR).
 - Không chạy lệnh phá huỷ (`reset --hard`, `clean -fd`) — theo `git-guardian`.
 - Bug do thiết kế sai → dừng, đưa về `ka-plan`.
+
+## 6. Postmortem (SEV1/SEV2)
+
+Sau khi khắc phục sự cố nghiêm trọng, viết postmortem theo `templates/POSTMORTEM.md` (nằm ngay trong thư mục skill này), lưu `docs/postmortems/<yyyy-mm-dd>-<slug>.md`:
+- Dòng thời gian lấy từ nhật ký điều tra Pha 3, không viết lại từ trí nhớ.
+- Nguyên nhân gốc kỹ thuật, không phải "ai đó quên".
+- Action item có owner + hạn, map sang test/alert/runbook.
