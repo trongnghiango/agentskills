@@ -1,13 +1,16 @@
-# Eval Cases — ka-fe
+# Eval Cases
 
-`ka-fe` implements React/TanStack UI components, hooks, forms, and component/a11y tests.
+Run these whenever `SKILL.md` changes. `ka-fe` is `user-invocable: false` — these cases test behavior when routed from `ka-execute`.
 
 ```json
 [
-  {"id":1,"prompt":"viết component OrderList với React Query, trạng thái loading/empty/error và test MSW","should_trigger":true,"description":"Core React + TanStack Query + RTL/MSW work"},
-  {"id":2,"prompt":"sửa lỗi nút Lưu không disable khi form đang submit ở màn Profile","should_trigger":true,"expected_behavior":"Lite/PATCH — 0 markdown files, no internal hard-stops, RED->GREEN component test + fix","description":"Small UI fix runs without 3 pre-coding hard-stops"},
-  {"id":3,"prompt":"viết migration thêm bảng user_sessions trong Postgres","should_trigger":false,"description":"Belongs to ka-db-schema, not ka-fe"},
-  {"id":4,"prompt":"(scenario: API payload omits _actions in an SD-UI repo)","should_trigger":null,"expected_behavior":"Graceful degradation to Read-Only Mode — mutating buttons hidden","description":"Never fail open when _actions is undefined"},
-  {"id":5,"prompt":"(scenario: component calls fetch() inside useEffect instead of React Query)","should_trigger":null,"expected_behavior":"Flagged by State Separation rule","description":"Server state belongs in React Query hooks"}
+  {"id":1,"prompt":"(ka-fe receives handoff with 03_be_walkthrough.md present in docs/context/)","expected_behavior":"Handoff-driven mode — extracts contract paths, schemas, and _actions from walkthrough before starting","description":"Context Handoff Check must detect and use existing BE walkthrough"},
+  {"id":2,"prompt":"(ka-fe receives options but no handoff file exists)","expected_behavior":"Independent mode — proceeds with API Contract Alignment from shared/contracts/ or src/api/generated/","description":"Missing handoff should not block FE work, just switch mode"},
+  {"id":3,"prompt":"(API response missing _actions field)","expected_behavior":"Graceful Degradation — hide all mutating buttons, render Read-Only Mode","description":"Missing _actions must never fail-open with visible edit/delete buttons"},
+  {"id":4,"prompt":"(ka-fe Step 1 analysis completed)","expected_behavior":"HARD STOP — must print 'Vui lòng gõ OK để tôi tiến hành thiết kế kiến trúc FE' and wait","description":"Skipping hard-stop at Step 1 risks building on unvalidated UI assumptions"},
+  {"id":5,"prompt":"(ka-fe implementation uses raw fetch() instead of React Query hook)","expected_behavior":"Commandment #1 violation — data fetching must use custom hooks wrapping React Query","description":"Exit verification must catch raw fetch/axios usage outside React Query"}
 ]
 ```
+
+## Anti-pattern to catch in eval
+A failing response for id 3 renders action buttons when `_actions` is undefined — this is a security-sensitive UI leak. A failing response for id 4 skips the hard-stop and proceeds directly to implementation plan — the user loses the opportunity to correct UI assumptions early.

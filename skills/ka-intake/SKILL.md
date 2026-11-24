@@ -2,74 +2,80 @@
 name: ka-intake
 description: "Requirement completeness checker. Dùng khi nhận yêu cầu mới chưa rõ actor/scope/input/output/success criteria — hỏi gom một lượt trước khi thiết kế hay code. Auto qua Intake Rule trong AGENTS.md; /ka-intake cũng gọi được. Do NOT use for việc cosmetic/typo."
 license: Proprietary - internal ka-team use only
-compatibility: Host-agnostic. Loaded via the always-on Intake Rule in AGENTS.md — see references/completeness-checklist.md.
+compatibility: Designed for DeepSeek Harness (DSH). Loaded via the always-on rule in AGENTS.md — see references/completeness-checklist.md for the field checklist this rule points to.
 metadata:
-  version: "2.0.0"
+  version: "1.0.0"
   risk: low
   source: custom-ka-team
-user-invocable: true
 ---
 
 # Ka Intake — Requirement Completeness Check
 
-> **Language & Interaction Policy**: Checklist evaluation runs internally in English. Every user-facing prompt (batched clarifying questions, fast-track summary, assumptions) MUST match the user's input language (Vietnamese when prompted in Vietnamese).
+> **Language & Interaction Policy**: Requirement completeness verification and checklist processing are evaluated internally in English. When asking batched clarifying questions, the agent MUST ask in the user's prompt language (defaulting to Vietnamese when the user prompts in Vietnamese). Reference: `standards/LANGUAGE_AND_INTERACTION_STANDARD.md`.
 
 ## Purpose
-Sits before `ka-plan` and `ka-workflow` on every request. Its only job is to answer honestly: **does this request contain enough business-level detail to act on without guessing?** If not, it asks — instead of letting the agent quietly invent business rules.
+Sits before `ka-plan` and `ka-execute` in every request. Its only job is to answer one question honestly: **does this request already contain enough business-level detail to act on without guessing?** If not, it asks — instead of letting the AI quietly fill the gap with a "reasonable" assumption that may not match what the user actually wants.
 
-- `ka-intake` checks *requirement* completeness (actor, trigger, input, output, success criteria, edge cases, constraints, scope).
-- `ka-plan` challenges *design* trade-offs ("what breaks at 10x, which architecture"). `ka-intake` runs first.
+This is not the same job as `ka-plan`'s D1 Socratic exploration. `ka-plan` challenges *design* assumptions ("why are we doing this, what breaks at scale"). `ka-intake` checks *requirement* completeness ("do we even know who the actor is, what triggers this, what counts as success") — a request can be technically unambiguous in design terms while still missing basic business facts. Both can fire on the same request; `ka-intake` runs first.
 
 ## When this activates
-Triggered by the always-on Intake Rule in `AGENTS.md` before `ka-workflow` or `ka-plan` begins work, or manually via `/ka-intake`.
-**Skip immediately** when:
-1. A locked `decisions.json` entry (`status: "locked"`, unconsumed) already covers this feature, OR
-2. The request is a pure cosmetic/typo fix, knowledge question, or read-only inspection with zero ambiguity.
+Triggered by the always-on Intake Rule in `AGENTS.md` on every request, before `ka-workflow`/`ka-plan`/`ka-execute` begin work — auto via AGENTS.md rule, and callable manually via `/ka-intake`. Skipped only if the request already references a locked `decisions.json` entry (intake was already done for that decision).
 
-## Dual Execution Modes (Fast-Track vs Batched Check)
+## Dual Execution Modes (Socratic vs Fast-Track)
 
-### Mode A: Guarded Fast-Track Mode
-**Activates ONLY when**:
-1. User supplies a structured template from `templates/` (`fast-track-feature.md`, `fast-track-hotfix.md`, `fast-track-worker.md`, `fast-track-refactor.md`), OR
-2. At least **6 of 8** checklist fields are already present/unambiguous from repo context and the remaining fields are harmless technical defaults, OR
-3. User explicitly requests skipping discovery (`/ka-intake --fast-track`, *"fast-track"*, *"bỏ qua phỏng vấn"*). Casual urgency words alone (*"làm ngay"*, *"nhanh lên"*) on a 1-line vague prompt do **NOT** qualify if material business fields are missing.
+`ka-intake` operates in one of two modes depending on the request nature:
 
-**Safety floor in Fast-Track Mode (non-negotiable)**:
-- If the request touches **irreversible / high-blast-radius** behavior (deleting/mutating production data, money/billing math, auth/permissions/tenant isolation, or production ops) AND a material field is ambiguous → ask **1 compact question** (≤3 bullets) instead of guessing.
-- Fast-Track **never waives** Tier 3–4 confirmations (`schema`, `ops`, auth/payment changes) in `ka-workflow`.
-- Otherwise, ask 0 questions, state any safe defaults explicitly in 3 lines, and hand off:
+### Mode A: Fast-Track Autonomous Mode (Bypass Questions)
+**Kích hoạt khi**:
+1. User cung cấp một trong các template mẫu từ `templates/` (`fast-track-feature.md`, `fast-track-hotfix.md`, `fast-track-worker.md`, `fast-track-refactor.md`).
+2. User sử dụng các từ khóa gia tốc: *"fast-track"*, *"tự hành"*, *"triển khai nhanh"*, *"bỏ qua phỏng vấn"*, *"không hỏi vòng vo"*, *"làm ngay"*.
+3. Request đã có đủ 5/8 trường cốt lõi và các trường còn lại thuộc nhóm có thể tự suy luận an toàn từ codebase.
+
+**Hành vi trong Fast-Track Mode**:
+- **KHÔNG HỎI BẤT KỲ CÂU NÀO** (Bypass Step 2 batched questions).
+- Tự động điền các giá trị mặc định chuẩn mực dựa trên codebase (convention over configuration).
+- Tóm tắt yêu cầu trong 3 dòng dứt khoát:
   ```text
   ⚡ FAST-TRACK ACTIVATED:
-  • Mục tiêu & Ranh giới: <Core Goal | In-scope vs Out-of-scope>
-  • Giả định mặc định: <Explicit defaults inferred from repo>
-  • Tiếp theo: ka-plan (1-turn lock) / ka-workflow Execute
+  • Mục tiêu: <Core Goal>
+  • Ranh giới: <In-scope vs Out-of-scope>
+  • Tiêu chuẩn: Clean Architecture 4 tầng + TDD + Single Screen Rule
   ```
+- Lập tức chuyển sang `ka-plan` (để khóa `decisions.json` trong 1 turn) hoặc `ka-execute` để tự hành 100%.
 
-### Mode B: Batched Completeness Check (Default for ambiguous requests)
+### Mode B: Socratic Exploration Mode (Phỏng vấn Khai phá)
+**Kích hoạt khi**: Request ngắn gọn, mơ hồ, chưa rõ actor hay mục tiêu nghiệp vụ cốt lõi và KHÔNG bật cờ fast-track. Tiến hành theo Step 1 đến Step 4 bên dưới.
 
-#### Step 1 — Run the checklist
-Classify each field in `references/completeness-checklist.md`:
-- **Present** — stated or unambiguously implied by conversation/codebase context.
-- **Missing, safe to default** — technical detail with no business consequence — do not ask.
-- **Missing and material** — could change outcome, scope, permissions, or data integrity if guessed wrong — must ask.
+## Step 1 — Run the checklist
+Check the request against `references/completeness-checklist.md`. For each field, classify as:
+- **Present** — stated explicitly or unambiguously implied by context already in the conversation.
+- **Missing but safe to default** — a technical detail with no business consequence (e.g. variable naming, code style) — do not ask.
+- **Missing and material** — could change the outcome, scope, or correctness if guessed wrong — must ask.
 
-#### Step 2 — Ask once, batched
-Ask all "Missing and material" fields in **one compact message** (aim for 2–4 sharp questions, never a 10-item questionnaire):
-```text
-🗣️ Để làm đúng, mình cần chốt nhanh:
-1. <field>: <question + concrete options if helpful>
+## Step 2 — Ask, batched
+If any field is "Missing and material", ask for **all of them in a single message**, not one at a time.
+```
+🗣️ Để làm đúng, mình cần biết thêm:
+1. <field>: <question>
 2. <field>: <question>
+[...]
 ```
 🛑 **HARD STOP** — wait for the user's reply.
 
-**Max 2 rounds.** For small/PATCH work, cap at **1 round**. If gaps remain after the cap, state your best-guess assumptions explicitly (`[ASSUMPTION]`) and proceed.
+**Limit: at most 2 rounds of batched questions.** If material gaps remain after round 2, state your best-guess interpretation explicitly, flag it as an assumption, and proceed — do not loop a third time. This mirrors the same loop-exit pattern already used in `ka-plan`'s D1.
 
-#### Step 3 — Hand off (no extra confirmation turn)
-Restate the completed requirement in 2–3 sentences (including any `[ASSUMPTION]` tags) and immediately route forward without asking an extra "is this restatement OK?":
-- Needs design/trade-off choice → `ka-plan`.
-- Concrete, scoped action → `ka-workflow` (Execute stage) or the matching worker in `lite` repos.
+## Step 3 — Confirm the completed requirement
+Once all material fields are resolved (answered or explicitly flagged as an assumption), restate the requirement back in 2-4 sentences and proceed — no need for a separate yes/no here if the restatement is uncontroversial; only re-confirm if the user's answers were themselves ambiguous.
+
+## Step 4 — Hand off
+Pass the completed requirement forward:
+- If it implies a design/architecture decision → `ka-workflow` routes to `ka-plan`.
+- If it's a concrete, already-scoped action → `ka-workflow` routes to `ka-execute` directly.
+
+`ka-intake` does not decide which of these two paths to take — that classification still belongs to `ka-workflow`/`ka-plan`. `ka-intake` only guarantees the input to that classification is complete.
 
 ## References
-- `references/completeness-checklist.md` — the 8 fields with "material" vs "safe to default" examples.
-- `references/eval-cases.md` — should-ask / should-not-ask / fast-track guard eval prompts.
-- `templates/fast-track-feature.md`, `templates/fast-track-hotfix.md`, `templates/fast-track-worker.md`, `templates/fast-track-refactor.md`.
+- `references/completeness-checklist.md` — the fields checked in Step 1, with worked examples of "material" vs "safe to default".
+- `references/eval-cases.md` — should-ask / should-not-ask test prompts.
+- `ka-plan` — design reasoning, runs after intake if a design question is triggered.
+- `ka-workflow` — routes the completed requirement to the right next skill.

@@ -1,10 +1,10 @@
 ---
 name: ka-handoff
-description: "Handoff document writer. Dùng khi cần tóm tắt, đóng gói context để session/agent sau tiếp tục, hoặc sau khi xong feature. Ghi docs/handoff/ với trạng thái, quyết định, việc còn lại. Do NOT use for thiết kế mới (ka-plan)."
+description: "Handoff document writer. Dùng khi cần đóng gói context cho session/agent khác, hoặc sau khi xong feature. Ghi docs/handoff/ với trạng thái, quyết định, việc còn lại. Do NOT use for thiết kế mới (ka-plan)."
 license: Proprietary - internal ka-team use only
-compatibility: Host-agnostic. Generates handoff markdown documentation in docs/handoff/.
+compatibility: Designed for DeepSeek Harness (DSH). Generates handoff markdown documentation in docs/handoff/.
 metadata:
-  version: "1.2.0"
+  version: "1.1.0"
   risk: low
   source: custom-ka-team
 user-invocable: true
@@ -38,11 +38,11 @@ argument-hint: "What will the next session be used for?"
 | Constraints | Do-not-touch areas, non-negotiables, anything explicitly out of scope |
 | Risk context | Current risk tier per AGENTS.md four-tier ladder, if the work touches a classified operation |
 | Artifacts | Links/paths to PRDs, plans, ADRs, issues, commits, diffs — reference only, do not duplicate content |
-| Decisions | Pull from `.agents/memory/decisions.json` (and `.agents/memory/features/*.json`) if present in the workspace; else summarize inline |
+| Decisions | Pull from `decisions.json` if present in the workspace; else summarize inline |
 | Next steps | Ordered list, actionable |
 | Blockers | Open questions / unresolved risks |
 | Prior handoff | Path to the previous handoff file in this chain, if one exists (check `docs/handoff/latest.md` before overwriting it) |
-| Suggested skills | From `.agents/skills/` (or `~/.agents/skills/`) matching Next steps — name + one-line reason |
+| Suggested skills | From `.claude/skills/` (or configured registry) matching Next steps — name + one-line reason |
 
 ## Rules
 
