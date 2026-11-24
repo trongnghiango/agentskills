@@ -1,0 +1,47 @@
+{
+  "profile": "lite",
+  "description": "Lite profile for small repos, scripts and solo work: no design/ADR/review stages. Keeps the two checks that pay for themselves: script-verified tests and one human sign-off.",
+  "initial": "IN_PROGRESS",
+  "states": {
+    "IN_PROGRESS": {
+      "transitions": {
+        "INIT": "IN_PROGRESS",
+        "READY_FOR_TEST": "TEST_GATE",
+        "EXECUTE_OPS": "DEPLOYMENT_GATE"
+      }
+    },
+    "TEST_GATE": {
+      "gate": "TEST_EVIDENCE_GATE",
+      "verify": "test_runs",
+      "transitions": {
+        "PASS": "COMPLETION_GATE",
+        "FAIL": "BLOCKED"
+      }
+    },
+    "DEPLOYMENT_GATE": {
+      "gate": "DEPLOYMENT_GATE",
+      "approval": "human",
+      "transitions": {
+        "APPROVE": "COMPLETION_GATE",
+        "REJECT": "IN_PROGRESS"
+      }
+    },
+    "COMPLETION_GATE": {
+      "gate": "COMPLETION_GATE",
+      "approval": "human",
+      "transitions": {
+        "APPROVE": "READY_TO_ARCHIVE",
+        "REQUEST_CHANGES": "IN_PROGRESS"
+      }
+    },
+    "BLOCKED": {
+      "gate": "BLOCKER_RESOLUTION_GATE",
+      "approval": "human",
+      "transitions": {
+        "RESUME": "IN_PROGRESS",
+        "RESUME_TEST": "TEST_GATE"
+      }
+    },
+    "READY_TO_ARCHIVE": {}
+  }
+}

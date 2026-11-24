@@ -1,17 +1,19 @@
 {
+  "profile": "full",
   "initial": "DESIGN_NEEDED",
   "states": {
     "DESIGN_NEEDED": {
       "transitions": {
         "PLAN_FAST_TRACK": "LOCKED_DECISION",
-        "PLAN_COMPLEX": "ADR_GATE",
-        "PLAN_STANDARD": "LOCKED_DECISION",
         "PLAN_PATCH": "LOCKED_DECISION",
+        "PLAN_STANDARD": "LOCKED_DECISION",
+        "PLAN_COMPLEX": "ADR_GATE",
         "INIT": "DESIGN_NEEDED"
       }
     },
     "ADR_GATE": {
       "gate": "ADR_APPROVAL_ON_COMPLEX",
+      "approval": "human",
       "transitions": {
         "APPROVE": "LOCKED_DECISION",
         "REJECT": "DESIGN_NEEDED"
@@ -19,38 +21,55 @@
     },
     "LOCKED_DECISION": {
       "transitions": {
-        "EXECUTE_BE": "BE_REVIEW_GATE",
-        "EXECUTE_OPS": "DEPLOY_RESULT",
-        "EXECUTE_FE": "BUILD_DONE",
-        "EXECUTE_SCHEMA": "BUILD_DONE",
-        "EXECUTE_CONTRACT": "BUILD_DONE",
-        "EXECUTE_TEST": "TEST_GATE"
+        "EXECUTE_BE": "TEST_GATE",
+        "EXECUTE_FE": "TEST_GATE",
+        "EXECUTE_SCHEMA": "TEST_GATE",
+        "EXECUTE_CONTRACT": "TEST_GATE",
+        "EXECUTE_TEST": "TEST_GATE",
+        "EXECUTE_OPS": "DEPLOYMENT_GATE"
       }
     },
-    "BE_REVIEW_GATE": {
-      "gate": "BE_REVIEW_GATE",
+    "TEST_GATE": {
+      "gate": "TEST_EVIDENCE_GATE",
+      "verify": "test_runs",
       "transitions": {
-        "SUCCESS_WITH_UI": "BE_FE_GATE_ON_UI",
+        "PASS": "REVIEW_GATE",
+        "FAIL": "BLOCKED"
+      }
+    },
+    "REVIEW_GATE": {
+      "gate": "REVIEW_GATE",
+      "approval": "human",
+      "approval_for": ["APPROVE", "SUCCESS_WITH_UI", "SUCCESS_NO_UI", "REQUEST_CHANGES"],
+      "transitions": {
+        "APPROVE": "BUILD_DONE",
         "SUCCESS_NO_UI": "BUILD_DONE",
+        "SUCCESS_WITH_UI": "BE_FE_GATE_ON_UI",
+        "REQUEST_CHANGES": "LOCKED_DECISION",
         "FAILURE": "BLOCKED"
       }
     },
     "BE_FE_GATE_ON_UI": {
       "gate": "BE_FE_GATE_ON_UI",
+      "approval": "human",
       "transitions": {
-        "APPROVE": "BUILD_DONE"
+        "APPROVE": "LOCKED_DECISION",
+        "SKIP_UI": "BUILD_DONE"
       }
     },
     "BUILD_DONE": {
       "transitions": {
+        "NEXT_STEP": "LOCKED_DECISION",
         "PROPOSE_DEPLOY": "DEPLOYMENT_GATE",
         "SKIP_DEPLOY": "COMPLETION_GATE"
       }
     },
     "DEPLOYMENT_GATE": {
       "gate": "DEPLOYMENT_GATE",
+      "approval": "human",
       "transitions": {
-        "APPROVE": "DEPLOY_RESULT"
+        "APPROVE": "DEPLOY_RESULT",
+        "REJECT": "BUILD_DONE"
       }
     },
     "DEPLOY_RESULT": {
@@ -61,36 +80,22 @@
     },
     "COMPLETION_GATE": {
       "gate": "COMPLETION_GATE",
+      "approval": "human",
       "transitions": {
-        "APPROVE": "READY_TO_ARCHIVE"
+        "APPROVE": "READY_TO_ARCHIVE",
+        "REQUEST_CHANGES": "LOCKED_DECISION"
       }
     },
     "BLOCKED": {
       "gate": "BLOCKER_RESOLUTION_GATE",
+      "approval": "human",
       "transitions": {
-        "RESUME_BE": "BE_REVIEW_GATE",
         "RESUME_PATCH": "LOCKED_DECISION",
-        "RESUME_FE": "BUILD_DONE",
-        "ROLLBACK_TO_DESIGN": "DESIGN_NEEDED",
-        "RESUME_TEST": "TEST_GATE"
+        "RESUME_TEST": "TEST_GATE",
+        "RESUME_REVIEW": "REVIEW_GATE",
+        "ROLLBACK_TO_DESIGN": "DESIGN_NEEDED"
       }
     },
-    "READY_TO_ARCHIVE": {},
-    "TEST_GATE": {
-      "gate": "TEST_EVIDENCE_GATE",
-      "transitions": {
-        "PASS": "BUILD_DONE",
-        "FAIL": "BLOCKED"
-      },
-      "requires": [
-        "command",
-        "red_output",
-        "green_output",
-        "cases"
-      ],
-      "requires_for": [
-        "PASS"
-      ]
-    }
+    "READY_TO_ARCHIVE": {}
   }
 }
