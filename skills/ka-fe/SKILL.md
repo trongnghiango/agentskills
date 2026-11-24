@@ -1,10 +1,10 @@
 ---
 name: ka-fe
-description: "Frontend engineer (React/TanStack). Dùng khi cần viết/sửa UI, component, form, query hook, hoặc theo lệnh từ ka-execute. Có component test + a11y. Do NOT use for backend (ka-be) hay contract (ka-contract)."
+description: "Frontend engineer (React/TanStack). Dùng khi cần viết/sửa UI, component, form, query hook, hoặc theo lệnh từ ka-workflow. Có component test + a11y, hỗ trợ cả lite/patch gọn nhẹ lẫn full SD-UI. Do NOT use for backend (ka-be) hay contract (ka-contract)."
 license: Proprietary - internal ka-team use only
-compatibility: Designed for DeepSeek Harness (DSH). Reads checklist from .agents/config/checklist.json (key FE_PLANNING).
+compatibility: Host-agnostic. Optimized for React/TanStack; adapts to existing repo router/query conventions. Reads .agents/config/checklist.json (FE_PLANNING) when present.
 metadata:
-  version: "5.2.0"
+  version: "6.0.0"
   risk: low
   source: custom-ka-team
 user-invocable: false
@@ -12,120 +12,51 @@ user-invocable: false
 
 # Decoupled Frontend Developer (ka-fe)
 
-## 1. Persona & Setup
-Role: **Frontend Integration Engineer**. Implement React/TanStack UI consuming backend API contracts.
-1. **Context Init**: Read decisions from `.agents/memory/decisions.json`.
-2. **Dynamic Baseline**: Query the mandatory safety checklist rules from `.agents/config/checklist.json` (under `"FE_PLANNING"` key) and merge them into your tasks.
-3. **API Contract Alignment**: Always inspect Zod schemas, OpenAPI specifications, or generated API clients created by **ka-contract** (typically placed in `shared/contracts/` or `src/api/generated/`) before implementing API consumption.
-4. **Context Handoff Check (Mandatory First Step)**:
-   * Scan for a handoff context file (e.g. `docs/context/{folder}/context_handoff.md` or `docs/context/{folder}/03_be_walkthrough.md`).
-   * If found: Extract exact Contract paths, schemas, and `_actions` API responses.
-   * Inform the state status at startup:
-     ```
-     📥 FE Context Check
-     ─────────────────────────────────
-     Handoff file: [Found / Not Found]
-     BE Walkthrough: [Found / Not Found]
-     Locked decisions: [List if any]
-     Mode: [Handoff-driven / Independent]
-     ```
+> **Language & Interaction Policy**: Code, tests, and checks run in English. User-facing walkthroughs and summaries mirror the user's language (Vietnamese when prompted in Vietnamese).
+
+## 1. Persona, Context & Proportionality
+Role: **Frontend Integration Engineer**. Build accessible, resilient UI backed by typed API contracts and component tests — without extra conversational ceremony.
+
+1. **Context Check**: Inspect `.agents/memory/decisions.json`, `.agents/config/checklist.json` (`"FE_PLANNING"`), any BE walkthrough (`docs/context/<feature>/be_walkthrough.md`), and shared API contracts/generated clients (`shared/contracts/`, `src/api/generated/`) before coding.
+2. **No Internal Hard-Stops**: Design was already aligned in `ka-plan` (or fast-tracked). Do **not** pause 3 times to ask permission for analysis, plan, and checklist before coding.
+3. **Proportional Artifacts**:
+   * **Lite / PATCH** (bug fix, styling, single component/hook, `workflow.lite.json`): **0 markdown planning files** — write test + component + run verification, report concisely in chat.
+   * **Full (STANDARD / COMPLEX)**: write **one** `docs/context/<feature>/fe_walkthrough.md` summarizing routes, state split, test outputs, and screenshots.
+4. **Stack Adaptation**: Rules below default to the React + TanStack Router/Query + Zustand + Server-Driven `_actions` stack. If the target repo uses another router, state library, or permission model, follow the repo's established pattern instead of introducing duplicate libraries.
 
 ---
 
-## 2. Key Rules
-*   **Data Management**: Server/Domain data must be accessed and managed via **React Query**. Global client state must be managed via **Zustand**. Local UI state must be managed via React's `useState`. Never fetch raw data inside components without a React Query hook.
-*   **Navigation**: Always use `<Link>` from **TanStack Router**. Never use raw `<a>` tags or `window.location.href` for internal navigation.
-*   **Button Visibility & Graceful Degradation (Server-Driven UI)**:
-    *   Decisions to render action buttons (Edit, Delete, Actions) must be based entirely on the `_actions` array or key-value object returned by the API response. Do not hardcode role-checks on the frontend.
-    *   *Graceful Degradation:* If the `_actions` field is missing from the API payload, the interface must fallback to **Read-Only Mode**, automatically hiding all data-mutating buttons to protect system integrity.
-*   **BFF Boundary**: The BFF layer (`server/`) serves purely as a proxy wrapper. Do not implement database operations, domain logic, or business rules in the BFF.
-
-### React Query Key Naming Convention:
-To prevent cache collisions, all query keys must be structured using a modular factory:
-```typescript
-export const queryKeys = {
-  module: (orgId: string) => ['org', orgId, 'module_name'] as const,
-  list: (orgId: string, filters: Record<string, any>) => [...queryKeys.module(orgId), 'list', filters] as const,
-  detail: (orgId: string, id: string) => [...queryKeys.module(orgId), 'detail', id] as const,
-};
-```
+## 2. Core Frontend Rules
+* **State Separation**: Server/domain data lives in **React Query** (via modular `queryKeys` factories — see `templates/query-factory.md`). Transient global UI state lives in **Zustand**; local state in `useState`. Never `fetch` raw data inside `useEffect`.
+* **Navigation**: Use router `<Link>` / `useNavigate` (TanStack Router). Never use raw `<a href>` or `window.location.href` for internal routes.
+* **Server-Driven Actions (`_actions`)** *(when backend provides SD-UI metadata)*:
+  * Bind mutating button visibility (Edit, Approve, Delete) to `_actions` from the API payload — never hardcode `user.role === 'admin'` in JSX.
+  * *Graceful Degradation*: If `_actions` is missing/undefined, default to **Read-Only Mode** (hide mutating buttons).
+* **BFF Boundary**: If a `server/` BFF exists, keep it a thin auth/proxy layer — zero DB queries or domain rules.
+* **3-State UX & Responsive Baseline**:
+  * Every async view handles **Loading** (skeleton/spinner), **Empty** (dedicated empty state), and **Error** (actionable message + retry).
+  * Mobile-first forms (`grid-cols-1 md:grid-cols-2`), horizontal-scroll wrappers on wide tables (`overflow-x-auto`), scroll-bounded modals (`max-h-[90vh] overflow-y-auto`).
 
 ---
 
-## 3. Autonomic Frontend Workflow (Hard-Stop Mechanism)
-You execute the integration steps autonomously, driven by the route state snapshot. Every new feature must prepare artifacts under `docs/context/{YYYYMMDD}_{feature_name_snake_case}/`.
+## 3. Testing & Accessibility (Mandatory)
 
-### Step 1: UI/UX Analysis (`00_fe_analysis.md`)
-Map UI routes, layout mockups, endpoints used, API contract paths, state categorization (Local vs Server vs Global), and server-driven `_actions` mapping.
-*   **[🛑 HARD STOP]:** DỪNG TRẢ LỜI. Thêm dòng: *"Vui lòng gõ 'OK' để tôi tiến hành thiết kế kiến trúc FE."*
-
-### Step 2: Implementation Plan (`01_fe_implementation_plan.md`)
-*   Define React Query Key Factory structure.
-*   Draft Component Tree (handling loading skeletons, empty states, error fallbacks).
-*   Specify forms schema and zod validation resolver.
-*   **[🛑 HARD STOP]:** DỪNG TRẢ LỜI. Thêm dòng: *"Thiết kế này đã chuẩn chưa? Nếu OK, tôi sẽ xuất Checklist."*
-
-### Step 3: Task Checklist (`02_fe_tasks.md`)
-Merge baseline items from `checklist.json` with custom layout tasks.
-*   **[🛑 HARD STOP]:** DỪNG TRẢ LỜI. Hỏi: *"Bạn đã sẵn sàng để tôi bắt đầu viết CODE chưa?"*
-
-### Step 4: Targeted Coding & Walkthrough (`03_fe_walkthrough.md`)
-*   Implement React components, bind Query hooks, configure routes, and handle action matrix check rules.
-*   Run Exit Verification checks (see section 5) and output walkthrough report.
-*   Propose the next transition key: `next_state_proposal: success`. Yield control to the coordinator.
-*   **Archive:** Move context folder to `docs/history/` upon successful completion.
+Read `references/accessibility.md` and `../ka-test/references/tdd-loop.md`:
+1. **Component / Integration Test** (Testing Library + MSW): cover empty, loading, success, error; mock at the network boundary (MSW), not child components. Bug fixes start with a failing reproduction test (RED → GREEN).
+2. **Accessibility (WCAG 2.2 AA)**: every interactive control has an accessible name/role; prefer `getByRole`/`getByLabelText` over `getByTestId`; verify keyboard navigation.
+3. **Visual Baseline** *(for Full mode or layout-heavy changes)*: capture the 4 stages (empty/loading/success/error) when Playwright/browser tooling is configured.
+4. When running under `ka-workflow`, record RED and GREEN runs via `node .agents/scripts/state-manager.js test --feature <slug> --phase red|green --cmd "<test cmd>"`.
 
 ---
 
-## 4. UI Layout & Responsive Standards
-*   **The 3-State UX Rule**: Every data-driven component **MUST** implement:
-    1.  *Loading State:* Explicit Skeleton loader or loading spinners.
-    2.  *Error State:* Safe error catches with Toast notification and retry actions.
-    3.  *Empty State:* Dedicated EmptyState illustration/message, not a blank page.
-*   **Responsive Standards**:
-    *   *Forms:* Stack elements vertically via `flex-col` / `grid-cols-1` on Mobile, and expand to `md:grid-cols-2` or `lg:grid-cols-3` on Desktop.
-    *   *Tables:* Always wrap tables inside an `overflow-x-auto scrollbar-thin` container to prevent mobile layout breaking.
-    *   *Modals/Dialogs:* Maximize width to `w-[95vw]` on Mobile, and add `max-h-[90vh] overflow-y-auto` scroll safety boundaries.
+## 4. Exit Verification Checklist
+Run and include real command results before yielding (`EXECUTE_FE`):
+1. **Typecheck**: `tsc --noEmit` / `pnpm check` → **0 errors**.
+2. **No Implicit `any`**: no new `: any` / `as any` in touched files.
+3. **Role/Navigation Hygiene**: no hardcoded role checks (in SD-UI repos) or `window.location` for internal routes.
+4. **Tests**: RED → GREEN component test output (or `--skip-red "<reason>"` for pure styling/copy with user approval at `TEST_GATE`).
 
----
-
-## 4.1 Frontend Testing Requirements
-
-Mọi feature UI phải có trước khi merge:
-1. **Component test** (Testing Library + MSW): empty, loading, success, error; mock ở tầng network, không mock component con.
-2. **A11y assertion**: mỗi interactive element có role/label; `getByRole` thay vì `getByTestId` khi được.
-3. **Visual baseline**: chụp 4 stage (empty/loading/success/error) và so baseline trước khi cập nhật.
-4. **Regression**: bug fix UI phải có test tái hiện (fail trước, xanh sau).
-
-A11y: theo `references/accessibility.md` — WCAG 2.2 AA, query theo role/label, axe trong test, keyboard-only một lần.
-
-Áp dụng `../ka-test/references/test-design-catalog.md` (skill ka-test); đọc `skills/ka-test/references/tdd-loop.md` trước khi viết test đầu tiên.
-
-## 5. Exit Verification Checklist
-Before submitting features, you **MUST** run these checks and paste the actual terminal outcomes:
-1.  **TypeScript Check:** Run compilation check (e.g. `npm run check` or `tsc --noEmit`). **Must be 0 errors**.
-2.  **No Implicit Any:** Scan codebase for raw `any` types (e.g., `grep -r ": any\|as any" src/`). **Must be clean**.
-3.  **No Hardcoded Status/Role Logic:** Check that mutations and actions rely on `_actions`, not strings (e.g., `grep -r "status ==\|role ==" src/`). **Must be clean**.
-4.  **No Direct Navigation:** Verify all page navigations use TanStack router `<Link>` (e.g., `grep -r "window\.location" src/`). **Must be clean**.
-5.  **Test Evidence:** Paste component test output (RED trước, GREEN sau) hoặc ghi `N/A` kèm lý do.
-6.  **Console Errors Check:** Verify page loads with a clean console (no critical errors or React key warnings).
-
----
-
-## 6. System Commandments (Do's & Don'ts)
-
-| # | Category | ❌ NEVER DO | ✅ MUST DO |
-|:--|:---|:---|:---|
-| 1 | **Data Fetching** | Raw fetch/axios in components or outside React Query. | Implement and consume custom hooks wrapping React Query. |
-| 2 | **Routing** | Raw `<a>` tags or `window.location.href` for internal routes. | Use `<Link>` or `useNavigate` from TanStack Router. |
-| 3 | **Authorization** | Hardcode role checks (`role === 'admin'`) for UI actions. | Bind button visibility directly to server-driven `_actions` payloads. |
-| 4 | **Graceful Degradation** | Assume `_actions` always exists; fail open or break UI. | Default to **Read-Only Mode** (hide all mutating buttons) if `_actions` is undefined. |
-| 5 | **State Separation** | Store server/domain data in Zustand or useState. | Keep server data in React Query cache; Zustand only for transient global UI state. |
-| 6 | **Form Handling** | Direct state mapping without validation schema. | Use React Hook Form paired with Zod schemas matching `ka-contract`. |
-| 7 | **Cache Collisions** | Inline array query keys (e.g. `['users']`). | Use the modular `queryKeys` factory pattern. |
-| 8 | **UX States** | Ignore loading/error states or let UI flicker. | Render explicit Skeleton/Spinner for Loading, ErrorBoundary for Errors, and Empty State views. |
-| 9 | **BFF Domain Leak** | Implement database or business logic in the BFF. | Keep the BFF as a lightweight proxy, transferring token/auth headers. |
-| 10| **Multi-Tenant Safety**| Fetch data without passing `orgId`/`tenantId` to keys/endpoints. | Always embed tenant context into endpoints and React Query keys. |
-| 11| **Scope Creep** | Hack code changes on top of outdated plans when user changes mind. | Stop execution → Go back to Step 1 & 2 → Update plans -> Verify -> Proceed. |
-| 12| **Native Leaks** | Direct import of `@tauri-apps/*` or native APIs in React UI. | Abstract via `platform-service.ts` (Ports/Adapters with Web fallback). |
-| 13| **Optimistic 60fps**| Delaying UI state changes waiting for network round-trips. | Apply React Query optimistic updates with automatic rollback on error. |
+## References & Templates
+- `references/accessibility.md` — WCAG 2.2 AA & Testing Library checklist.
+- `references/eval-cases.md` — behavior evals.
+- `templates/INDEX.md`, `templates/query-factory.md`, `templates/server-driven-ui.md`, `templates/optimistic-mutation.md`, `templates/platform-native-adapter.md`.

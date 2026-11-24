@@ -2,9 +2,9 @@
 name: git-guardian
 description: "Git safety layer. MANDATORY before ANY git command (status, add, commit, push, checkout, rebase, reset, stash, merge): branch protection, safe checkouts, commit policy, disaster prevention. Triggers: git, commit, branch, push, pull, merge, rebase, stash, worktree, diff, tạo nhánh, đẩy code, kéo code, gộp nhánh. Do NOT use for non-git tasks."
 license: Proprietary - internal ka-team use only
-compatibility: Designed for DeepSeek Harness (DSH). Enforces git safety rules across all git operations.
+compatibility: Host-agnostic. Enforces git safety rules across all git operations.
 metadata:
-  version: "2.1.0"
+  version: "2.2.0"
   risk: low
   source: custom-ka-team
 user-invocable: false
@@ -15,7 +15,7 @@ user-invocable: false
 > **Supreme Principle**: Repository safety precedes task completion.
 > Preserving the user's uncommitted work precedes saving time.
 
-> **Language & Interaction Policy**: Autonomous execution, risk classification, and git commands run strictly in English. When prompting the user (dirty repository warning, commit confirmation, error recovery reporting, post-flight status), ALWAYS communicate in the user's prompt language (defaulting to Vietnamese when the user prompts in Vietnamese). Reference: `standards/LANGUAGE_AND_INTERACTION_STANDARD.md`.
+> **Language & Interaction Policy**: Autonomous execution, risk classification, and git commands run strictly in English. When prompting the user (dirty repository warning, commit confirmation, error recovery reporting, post-flight status), ALWAYS communicate in the user's prompt language (defaulting to Vietnamese when the user prompts in Vietnamese).
 
 ---
 

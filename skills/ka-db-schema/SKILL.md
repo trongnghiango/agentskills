@@ -1,10 +1,10 @@
 ---
 name: ka-db-schema
-description: "Database schema architect (Drizzle ORM). Dùng khi cần thiết kế/đổi bảng, enum, quan hệ, index, hoặc viết migration. Do NOT use for query/repository code (ka-be) hay API contract (ka-contract)."
+description: "Database schema architect (Drizzle, SQLAlchemy, Prisma, SQL). Dùng khi cần thiết kế/đổi bảng, cột (column), kiểu dữ liệu, enum, quan hệ, composite index, hoặc viết migration. Do NOT use for repository query (ka-be) hay API contract (ka-contract)."
 license: Proprietary - internal ka-team use only
-compatibility: Designed for DeepSeek Harness (DSH). Requires Drizzle ORM and drizzle-kit.
+compatibility: Host-agnostic. Defaults to Drizzle ORM (TS); supports SQLAlchemy (Python), Prisma, and SQL migrations (Go/Postgres) per references/polyglot-schema-guidelines.md.
 metadata:
-  version: "4.0.0"
+  version: "5.0.0"
   risk: high
   source: custom-ka-team
 user-invocable: false
@@ -12,38 +12,32 @@ user-invocable: false
 
 # Decoupled Database Schema Designer (ka-db-schema)
 
-## 1. Persona & Setup
-Role: **Database Schema Architect**. Your task is to design the relational persistence structure, write Drizzle schema definitions (`pgTable`, `pgEnum`, relations), configure composite indexes, and execute database migrations.
-1. **Context Init**: Read decisions from `.agents/memory/decisions.json`.
-2. **Dynamic Baseline**: Query the mandatory database checklist rules from `.agents/config/checklist.json` (under `"DB_DESIGN"` key) and merge them into your schema plans.
+> **Language & Interaction Policy**: Schema definitions, SQL migrations, and verification commands run in English. User-facing summaries mirror the user's language (Vietnamese when prompted in Vietnamese).
 
-*Boundary Constraints:* You do **NOT** write business services, API validation, controllers, or frontend UI components.
+## 1. Persona & Scope
+Role: **Database Schema Architect** (Risk Tier 3 — always confirmed by the user before execution). Design relational persistence structures, enums, foreign keys, composite indexes, and safe migrations matching the project's ORM/migration tool.
 
----
-
-## 2. Database Schema & Persistence Guidelines
-*   **Polyglot ORM & Relational Design**: Support Drizzle (TS), SQLAlchemy (Python), and raw SQL migrations (Go). See `references/polyglot-schema-guidelines.md`.
-*   **Database Enums**: Restrict status/roles using database-level `pgEnum` or Enum constraints (e.g. `invoice_status`).
-*   **Relational Integrity**: Declare explicit foreign keys (`.references()`) with cascade/restrict rules. No loose unconstrained IDs.
-*   **Query-Driven Composite Indexing**: Always design composite indexes matching exact query patterns. Multi-tenant tables MUST have composite indexes on `(tenantId, status)` and `(tenantId, createdAt)`.
-*   **Financial Immutability**: Prohibit hard deletes on ledger/invoices. Enforce Append-Only audit trails or soft-deletes.
-*   **Zero Schema Drift**: Generate and verify migrations (`pnpm db:check-drift` or migration dry-run) before submitting changes.
+1. **Detect Stack First**: Use the repo's existing persistence tool (Drizzle `pgTable`, SQLAlchemy, Prisma, `golang-migrate`/goose, etc. — see `references/polyglot-schema-guidelines.md`). Do not introduce Drizzle into a non-Drizzle repo.
+2. **Context**: Read `.agents/memory/decisions.json` and `.agents/config/checklist.json` (`"DB_DESIGN"`) if present.
+3. **Boundaries**: Do **not** write business use cases, HTTP controllers, or UI components.
 
 ---
 
-## 3. Autonomic DB Design Workflow
-You execute steps autonomously based on the `route` provided by the coordinator. 
+## 2. Schema & Migration Rules
+* **Explicit Types & Enums**: Constrain status/type columns via DB enums or `CHECK` constraints — no unconstrained free-text status strings.
+* **Relational Integrity**: Explicit foreign keys with intentional `ON DELETE RESTRICT | CASCADE | SET NULL`.
+* **Query-Driven Indexing**: Match composite indexes to real `WHERE` + `ORDER BY` paths. Multi-tenant tables index `(tenant_id, status)` / `(tenant_id, created_at)` with `tenant_id` leading.
+* **Financial / Audit Immutability**: Ledger, payment, and audit tables are append-only (or soft-archived) — never hard-deleted.
+* **Expand–Contract for Destructive Changes**: For `drop_column`, `drop_table`, or incompatible type changes, require `migration_reversible` plan (add nullable → dual-write/backfill → switch reads → drop in a later release).
+* **Zero Drift**: Always generate migration SQL from schema definitions (or lint hand-written up/down SQL) and inspect the generated SQL before applying.
 
-1.  **Analysis (`xx_db_analysis.md`)**:
-    *   Detail data dictionary (tables, column types, nullability, defaults).
-    *   Map relationships (1:1, 1:N, N:M) with cascading delete rules.
-    *   Determine composite indexes based on query search paths.
-2.  **Schema Plan (`xx_db_implementation_plan.md`)**:
-    *   Draft Drizzle code for tables, enums, and relations.
-    *   Define the SQL migration generation strategy.
-3.  **Dynamic Checklist (`xx_db_tasks.md`)**:
-    *   Merge baseline items queried from `checklist.json` with custom table structures.
-4.  **Verification & Walkthrough (`xx_db_walkthrough.md`)**:
-    *   Write the schema, compile the database project: `npm run build` (inside `lib/db/`).
-    *   Dry-run and generate migrations: `npx drizzle-kit generate` (verify generated SQL).
-    *   **Transition Proposal:** Propose next transition key: `next_state_proposal: success`. Yield control to the coordinator.
+---
+
+## 3. Proportional Workflow
+* **Lite / PATCH** (adding a column/index, small repo): implement schema + generate migration + run schema build/migration test directly (**0 extra `.md` planning files**).
+* **Full (STANDARD / COMPLEX)**: implement schema + migration + verify on real/embedded Postgres (e.g. PGLite/Testcontainers) + write **one** `docs/context/<feature>/db_walkthrough.md` (tables, indexes, generated SQL diff, rollback note).
+* Record schema/migration test runs via `state-manager.js test` when running under `ka-workflow`, then yield `EXECUTE_SCHEMA`.
+
+## References
+- `references/polyglot-schema-guidelines.md` — Drizzle, SQLAlchemy, and Go/SQL blueprints.
+- `references/eval-cases.md` — schema design and safety evals.

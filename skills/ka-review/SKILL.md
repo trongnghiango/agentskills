@@ -1,10 +1,10 @@
 ---
 name: ka-review
-description: "Code & architecture auditor + security/perf depth. Dùng khi cần review diff/PR, kiểm tra Clean Architecture violation, tenant leak, security, performance. Do NOT use for viết code (ka-be/ka-fe) hay viết test (ka-test)."
+description: "Code & architecture auditor + security/perf depth. Dùng khi cần review diff/PR trước khi merge, kiểm tra Clean Architecture, tenant isolation/leak, ghost code, security, performance. Do NOT use for viết code (ka-be/ka-fe) hay viết test (ka-test)."
 license: Proprietary - internal ka-team use only
-compatibility: Designed for DeepSeek Harness (DSH). Reads git diff output for changed file analysis.
+compatibility: Host-agnostic. Reads git diff output for changed file analysis.
 metadata:
-  version: "2.4.0"
+  version: "3.0.0"
   risk: low
   source: custom-ka-team
 user-invocable: true
@@ -12,10 +12,12 @@ user-invocable: true
 
 # Code & Architecture Auditor (ka-review)
 
-## 1. Persona & Scope
-Role: **Principal Code Reviewer & Security Auditor**. Review source code modifications (via diffs or local files) to catch Clean Architecture violations, module boundary breaches, multi-tenant leaks, magic string clutter, and code readability issues before merging.
+> **Language & Interaction Policy**: Static scans and grep commands run in English. User-facing review reports mirror the user's language (Vietnamese when prompted in Vietnamese).
 
-> **Project-agnostic principle**: All audit checks below describe *patterns to detect*, not fixed strings to grep. Before running any automated audit, adapt grep patterns to the naming conventions of the target project.
+## 1. Persona, Scope & Context Proportionality
+Role: **Principal Code Reviewer & Security Auditor**. Review diffs or modules to catch real bugs, security/tenant leaks, boundary breaches, and dead code before merging.
+
+> **Project-agnostic & proportional**: Adapt checks to the target codebase's actual architecture. Enforce 4-tier Domain Purity and Server-Driven `_actions` **only** in repos that use Clean Architecture / SD-UI; in flat or `lite` repos, focus on correctness, security, tenant/authz safety, SQL/perf bugs, dead code, and test quality instead of flagging missing ceremony.
 
 ---
 
@@ -27,7 +29,7 @@ Role: **Principal Code Reviewer & Security Auditor**. Review source code modific
 | **Tenant Isolation** | Query mutations (`select`, `update`, `delete`) missing the primary tenant-boundary filter (typically `organizationId`, `tenantId`, or project equivalent). | **[BLOCKER]** Force tenant filter from request context. Never allow cross-tenant data leak. |
 | **Unsafe Fallback** | Code silently assigns a default/hardcoded ID when the real ID is missing (e.g. `someId \|\| hardcodedFallback`). This risks assigning unauthorized data to a privileged tenant. | **[BLOCKER]** Log warning, abort execution. Never silently fall back to a privileged resource ID. |
 | **Deep Import Leak** | Importing directly from a module's internal subpath instead of its public gateway (e.g. `index.ts` or barrel file). | Enforce the module Public API contract — consumers must import only through the module's declared public surface. |
-| **Magic Strings** | Domain-significant string literals (status codes, channel names, event types, roles) scattered inline as raw strings instead of typed constants. | Extract to domain Enums or Constants files. Export via the module's public gateway. Reference: see *examples/magic-strings.md*. |
+| **Magic Strings** | Domain-significant string literals (status codes, channel names, event types, roles) scattered inline as raw strings instead of typed constants. | Extract to domain Enums or Constants files. Export via the module's public gateway. |
 | **Code Readability** | Inline templates (HTML, SQL fragments, large config blobs) longer than ~10 lines embedded inside orchestration code; or 3+ levels of nested conditional logic. | Extract templates to dedicated helper/builder functions. Extract complex branching to named private methods. |
 | **Transaction Leak** | Services performing multiple database mutations without a wrapping transaction, leaving data in inconsistent states on partial failure. | Bundle all mutations under a transaction context manager. |
 | **SD-UI Actions** | Frontend renders action buttons or UI branches based on roles hardcoded in the client. | Reject. UI must derive allowed actions from `_actions` metadata returned by the API. |
