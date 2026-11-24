@@ -1,14 +1,13 @@
 ---
 name: ka-ops
-description: DevOps Engineer. Focuses strictly on Docker, Kubernetes, NixOS setups, and CI/CD pipelines.
+description: "DevOps/SRE. Dùng khi cần Dockerfile, K8s manifest, CI/CD, release/rollback, observability, hoặc deploy. Kèm references release-and-rollback + observability. Do NOT use for business logic (ka-be)."
 license: Proprietary - internal ka-team use only
-compatibility: Designed for Claude Code. Manages Docker, Kubernetes, and CI/CD configurations.
+compatibility: Designed for DeepSeek Harness (DSH). Manages Docker, Kubernetes, and CI/CD configurations.
 metadata:
-  version: "2.1.0"
+  version: "2.3.0"
   risk: high
   source: custom-ka-team
 user-invocable: false
-allowed-tools: Write Bash Read
 ---
 
 # Infrastructure & DevOps Engineer (ka-ops)
@@ -90,6 +89,18 @@ spec:
 ```
 
 ---
+
+## 3.1 Release, Migration & Rollback
+
+Đọc `references/release-and-rollback.md`: semver, expand–contract migration, feature flag lifecycle, canary 5→50→100, rollback criteria.
+
+## 3.2 Observability
+
+Đọc `references/observability.md`: structured log + request_id, RED metrics, trace, SLO/error budget, alert theo triệu chứng.
+
+## 3.3 CI Test Sharding
+
+Đọc `references/ci-test-sharding.md`: shard theo thời gian chạy thật, matrix Actions, mỗi shard DB riêng, artifact cả khi fail.
 
 ## 4. 4-Step Ops Workflow
 

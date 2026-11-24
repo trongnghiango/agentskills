@@ -1,14 +1,13 @@
 ---
 name: ka-fe
-description: Frontend Engineer Skill. Implement React/TanStack UI consuming backend API contracts.
+description: "Frontend engineer (React/TanStack). Dùng khi cần viết/sửa UI, component, form, query hook, hoặc theo lệnh từ ka-execute. Có component test + a11y. Do NOT use for backend (ka-be) hay contract (ka-contract)."
 license: Proprietary - internal ka-team use only
-compatibility: Designed for Claude Code. Reads checklist from .agents/config/checklist.json (key FE_PLANNING).
+compatibility: Designed for DeepSeek Harness (DSH). Reads checklist from .agents/config/checklist.json (key FE_PLANNING).
 metadata:
-  version: "5.0.0"
+  version: "5.2.0"
   risk: low
   source: custom-ka-team
 user-invocable: false
-allowed-tools: Write Bash Read
 ---
 
 # Decoupled Frontend Developer (ka-fe)
@@ -90,13 +89,26 @@ Merge baseline items from `checklist.json` with custom layout tasks.
 
 ---
 
+## 4.1 Frontend Testing Requirements
+
+Mọi feature UI phải có trước khi merge:
+1. **Component test** (Testing Library + MSW): empty, loading, success, error; mock ở tầng network, không mock component con.
+2. **A11y assertion**: mỗi interactive element có role/label; `getByRole` thay vì `getByTestId` khi được.
+3. **Visual baseline**: chụp 4 stage (empty/loading/success/error) và so baseline trước khi cập nhật.
+4. **Regression**: bug fix UI phải có test tái hiện (fail trước, xanh sau).
+
+A11y: theo `references/accessibility.md` — WCAG 2.2 AA, query theo role/label, axe trong test, keyboard-only một lần.
+
+Áp dụng `../ka-test/references/test-design-catalog.md` (skill ka-test); đọc `skills/ka-test/references/tdd-loop.md` trước khi viết test đầu tiên.
+
 ## 5. Exit Verification Checklist
 Before submitting features, you **MUST** run these checks and paste the actual terminal outcomes:
 1.  **TypeScript Check:** Run compilation check (e.g. `npm run check` or `tsc --noEmit`). **Must be 0 errors**.
 2.  **No Implicit Any:** Scan codebase for raw `any` types (e.g., `grep -r ": any\|as any" src/`). **Must be clean**.
 3.  **No Hardcoded Status/Role Logic:** Check that mutations and actions rely on `_actions`, not strings (e.g., `grep -r "status ==\|role ==" src/`). **Must be clean**.
 4.  **No Direct Navigation:** Verify all page navigations use TanStack router `<Link>` (e.g., `grep -r "window\.location" src/`). **Must be clean**.
-5.  **Console Errors Check:** Verify page loads with a clean console (no critical errors or React key warnings).
+5.  **Test Evidence:** Paste component test output (RED trước, GREEN sau) hoặc ghi `N/A` kèm lý do.
+6.  **Console Errors Check:** Verify page loads with a clean console (no critical errors or React key warnings).
 
 ---
 

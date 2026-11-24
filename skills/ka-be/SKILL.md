@@ -1,14 +1,13 @@
 ---
 name: ka-be
-description: Clean Architecture standard & task execution for backend services. Enforces layered design, domain purity, ports/adapters, and contracts. Optimized for low-token context usage.
+description: "Backend Clean Architecture implementer. Dùng khi cần viết/sửa code backend: module, use case, repository, domain entity, controller, hoặc theo lệnh từ ka-execute. Enforce 4 tầng, domain purity, ports/adapters. Do NOT use for thiết kế API contract (ka-contract) hay schema DB (ka-db-schema)."
 license: Proprietary - internal ka-team use only
-compatibility: Designed for Claude Code. Reads decisions from .agents/memory/decisions.json and checklists from .agents/config/checklist.json (key BE_PLANNING).
+compatibility: Designed for DeepSeek Harness (DSH). Reads decisions from .agents/memory/decisions.json and checklists from .agents/config/checklist.json (key BE_PLANNING).
 metadata:
-  version: "4.2.0"
+  version: "4.3.0"
   risk: medium
   source: custom-ka-team
 user-invocable: false
-allowed-tools: Write Bash Read
 ---
 
 # Decoupled Backend Developer (ka-be)
@@ -52,6 +51,10 @@ You execute steps autonomously based on the `route` provided by the coordinator.
    * Propose the next transition key: `next_state_proposal: success_with_ui` (if UI needed) or `next_state_proposal: success_no_ui` (if no UI needed). Yield control to the coordinator.
 
 ---
+
+## 3.1 Refactoring & Legacy
+
+Đọc `references/refactoring-legacy.md`: characterization test trước khi chạm code cũ, strangler fig, commit refactor tách khỏi fix/feature, khi nào xoá thay vì refactor.
 
 ## 4. System Commandments (Do's & Don't)
 

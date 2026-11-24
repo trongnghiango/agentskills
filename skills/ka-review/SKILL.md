@@ -1,14 +1,13 @@
 ---
 name: ka-review
-description: Static code analysis, architectural compliance auditor, security leak detector, and Drizzle query planner.
+description: "Code & architecture auditor + security/perf depth. Dùng khi cần review diff/PR, kiểm tra Clean Architecture violation, tenant leak, security, performance. Do NOT use for viết code (ka-be/ka-fe) hay viết test (ka-test)."
 license: Proprietary - internal ka-team use only
-compatibility: Designed for Claude Code. Reads git diff output for changed file analysis.
+compatibility: Designed for DeepSeek Harness (DSH). Reads git diff output for changed file analysis.
 metadata:
-  version: "2.2.0"
+  version: "2.4.0"
   risk: low
   source: custom-ka-team
 user-invocable: true
-allowed-tools: Read Bash
 ---
 
 # Code & Architecture Auditor (ka-review)
@@ -39,6 +38,18 @@ Role: **Principal Code Reviewer & Security Auditor**. Review source code modific
 | **Anti-Fraud Violation** | Hardcoding conditions (`if (code === '...')`, `if (month === 8)`) or fake accrual records to force numbers to match. | **[BLOCKER]** Strictly prohibit surface matching. Use algebraic formulas and report true discrepancies. |
 
 ---
+
+## 2.1 Security Depth (bắt buộc cho diff chạm auth/tiền/tenant)
+
+Đọc `references/security-audit.md`. Tối thiểu:
+1. Threat model 8 câu hỏi cho diff.
+2. Chạy `gitleaks`, `pnpm audit`, `osv-scanner`, `semgrep --config=auto`.
+3. Checklist thủ công: authz từng endpoint, IDOR, mass assignment, SSRF, secret, PII log.
+4. Finding theo severity + `file:line` + test chứng minh. Không có finding vẫn phải ghi đã kiểm tra gì.
+
+## 2.2 Performance Depth
+
+Đọc `references/performance-audit.md`. Chỉ báo finding perf khi có số: ngân sách p95, query time, bundle size, N+1, unbounded query. Đo baseline trước, sửa một thứ, đo lại.
 
 ## 3. 4-Step Review Workflow
 

@@ -1,14 +1,13 @@
 ---
 name: ka-contract
-description: Contract-First Designer. Focuses strictly on designing BE-FE API contracts, Zod request/response validation schemas, OpenAPI specs, and Orval client generation.
+description: "Contract-first API designer. Dùng khi cần định nghĩa/đổi API contract, Zod schema, OpenAPI spec, Orval client, hoặc kiểm tra breaking change giữa BE và FE. Verify consumer/provider trước khi deploy. Do NOT use for viết business logic (ka-be) hay schema DB (ka-db-schema)."
 license: Proprietary - internal ka-team use only
-compatibility: Designed for Claude Code. Generates OpenAPI specs and Zod schemas.
+compatibility: Designed for DeepSeek Harness (DSH). Generates OpenAPI specs and Zod schemas.
 metadata:
-  version: "4.0.0"
+  version: "5.0.0"
   risk: medium
   source: custom-ka-team
 user-invocable: true
-allowed-tools: Write Bash Read
 ---
 
 # Decoupled API Contract Designer (ka-contract)
@@ -50,4 +49,5 @@ You execute steps autonomously based on the `route` provided by the coordinator.
 4.  **Verification & Walkthrough (`xx_ct_walkthrough.md`)**:
     *   Write the specifications, run Orval client generation.
     *   Verify type compilation inside `lib/api-zod/` and `lib/api-client-react/`: `npm run build`.
+    *   Chạy contract verification theo `references/contract-verification.md`: Pact `can-i-deploy` (nếu dùng), OpenAPI drift diff, breaking-change checklist.
     *   **Transition Proposal:** Propose next transition key: `next_state_proposal: success`. Yield control to the coordinator.
