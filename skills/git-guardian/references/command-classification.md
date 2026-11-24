@@ -1,6 +1,6 @@
 # Git Command Classification
 
-## 🟢 SAFE — Chạy tự do, không cần xác nhận
+## 🟢 SAFE — Freely executable, no prior confirmation needed
 
 ```bash
 # Inspection
@@ -23,7 +23,7 @@ git config --list
 git rev-parse HEAD
 git rev-parse --abbrev-ref HEAD
 
-# So sánh
+# Comparison & Diagnostics
 git blame <file>
 git shortlog
 git describe
@@ -33,71 +33,71 @@ git ls-tree HEAD
 
 ---
 
-## 🟡 WARNING — Chạy sau khi giải thích và xác nhận
+## 🟡 WARNING — Execute only after explanation and user confirmation
 
 ```bash
 # Staging
-git add <file>          # OK nếu file đúng scope
-git add -p              # OK, interactive
-git add .               # CẦN XÁC NHẬN — add tất cả
+git add <file>          # OK if file is within task scope
+git add -p              # Interactive hunk staging
+git add .               # REQUIRES CONFIRMATION — stages everything indiscriminately
 
 # Commit
-git commit -m "..."     # Hỏi trước về message
-git commit --no-edit    # Chỉ dùng sau merge conflict
+git commit -m "..."     # Always ask user first about the commit message
+git commit --no-edit    # Only after resolving merge conflicts
 
 # Branch creation (local only)
 git branch <new-branch>
-git checkout -b <new-branch>    # Chỉ khi được yêu cầu
-git switch -c <new-branch>      # Chỉ khi được yêu cầu
+git checkout -b <new-branch>    # Only when explicitly requested
+git switch -c <new-branch>      # Only when explicitly requested
 
-# Fetch (safe, chỉ download)
+# Fetch (safe, download metadata only)
 git fetch
 git fetch --all
 git fetch --prune
 
-# Restore staged only
-git restore --staged <file>     # unstage, không mất changes
+# Restore staged status only
+git restore --staged <file>     # Unstage without losing working tree changes
 ```
 
 ---
 
-## 🟠 DANGEROUS — Cần xác nhận rõ ràng + giải thích đầy đủ rủi ro
+## 🟠 DANGEROUS — Requires explicit user confirmation + risk explanation
 
 ```bash
 # Merge
-git merge <branch>          # Giải thích conflicts có thể xảy ra
+git merge <branch>          # Explain potential conflicts before running
 git merge --no-ff <branch>
 git merge --squash <branch>
 
 # Pull
-git pull                    # = fetch + merge, giải thích rõ
-git pull --rebase           # Đặc biệt cẩn thận
+git pull                    # Equivalent to fetch + merge; explain risks
+git pull --rebase           # Rebase risk; requires high caution
 
 # Cherry-pick
-git cherry-pick <commit>    # Giải thích commit sẽ được copy
+git cherry-pick <commit>    # Explain that commit will be duplicated
 
 # Push (non-force)
-git push origin <branch>    # Xác nhận branch và remote
+git push origin <branch>    # Confirm target branch and remote name
 
-# Delete branch (local đã merge)
-git branch -d <branch>      # Chỉ khi đã merge
+# Delete branch (local, already merged)
+git branch -d <branch>      # Only if branch has been safely merged
 
-# Revert (safe nhưng tạo commit mới)
-git revert <commit>         # Giải thích sẽ tạo revert commit
+# Revert (safe but creates new commit)
+git revert <commit>         # Explain that a new revert commit will be created
 ```
 
 ---
 
-## 🔴 FORBIDDEN — Không thực thi trừ khi người dùng yêu cầu + xác nhận + hiểu hậu quả
+## 🔴 FORBIDDEN — Never execute unless explicitly ordered with acknowledged consequences
 
 ```bash
 # Rewrite history
-git reset HEAD~1            # Bất kỳ variant nào
+git reset HEAD~1            # Any variant
 git reset --soft HEAD~1
 git reset --mixed HEAD~1
 git reset --hard HEAD~1
-git reset --hard            # Xóa mọi uncommitted changes
-git rebase                  # Bất kỳ variant nào
+git reset --hard            # Destroys all uncommitted changes
+git rebase                  # Any rebase operation
 git rebase -i
 git rebase --onto
 git commit --amend
@@ -119,10 +119,10 @@ git push -f
 git push --force-with-lease
 git push --force-if-includes
 
-# Branch delete (chưa merge)
-git branch -D <branch>      # Xóa dù chưa merge — cực kỳ nguy hiểm
+# Branch deletion (unmerged)
+git branch -D <branch>      # Force deletes unmerged branch — data loss risk
 
-# Stash (không được yêu cầu)
+# Autonomous Stashing
 git stash
 git stash push
 git stash pop
@@ -130,39 +130,39 @@ git stash apply
 git stash drop
 git stash clear
 
-# Branch switch (không được yêu cầu)
+# Autonomous Branch Switching
 git checkout <other-branch>
 git switch <other-branch>
 ```
 
 ---
 
-## ⛔ NEVER — Không bao giờ trong bất kỳ tình huống nào
+## ⛔ NEVER — Strictly banned under all circumstances
 
 ```bash
-# Xóa refs quan trọng
+# Deleting critical references
 git update-ref -d HEAD
 git symbolic-ref HEAD /dev/null
 
-# Worktree nguy hiểm
-git worktree move           # Không tự ý move worktree
+# Unsafe worktree actions
+git worktree move
 
-# GC không cẩn thận
-git gc --prune=now          # Có thể xóa commits unreachable
+# Unsafe garbage collection
+git gc --prune=now          # Can delete unreachable recovery commits
 
-# Reflog expire sớm
+# Premature reflog expiration
 git reflog expire --all --expire=now
 ```
 
 ---
 
-## Bảng nhanh cho Protected Branches
+## Quick Matrix for Protected Branches
 
-| Branch | Allowed Actions | Forbidden |
-|--------|----------------|-----------|
+| Branch | Allowed Actions | Forbidden Actions |
+|--------|----------------|-------------------|
 | `main` | read, diff, log | commit, merge, push, rebase |
 | `master` | read, diff, log | commit, merge, push, rebase |
-| `release/*` | read, diff, log | mọi write operations |
-| `production` | read only | tất cả |
-| `feature/*` | tất cả safe + warning | force push |
-| `bugfix/*` | tất cả safe + warning | force push |
+| `release/*` | read, diff, log | all write operations |
+| `production` | read only | all mutating operations |
+| `feature/*` | all safe + warning | force push |
+| `bugfix/*` | all safe + warning | force push |

@@ -1,16 +1,17 @@
 ---
 name: git-guardian
 description: >
-  Hướng dẫn sử dụng Git một cách an toàn, chuyên nghiệp và hiệu quả cho AI Agent.
-  BẮT BUỘC đọc skill này trước khi thực hiện BẤT KỲ thao tác Git nào — kể cả
-  git status, git add, git commit, git push, checkout, rebase, reset, stash, merge.
-  Kích hoạt khi người dùng đề cập đến: commit, branch, push, pull, merge, rebase,
-  stash, worktree, repository, git log, git diff, hoặc bất kỳ lệnh git nào.
-  Skill này định nghĩa luật bắt buộc — vi phạm được coi là thất bại.
+  Git safety and operations layer for AI Agents. Enforces repository safety,
+  branch protection, safe checkouts/commits, and disaster prevention.
+  MANDATORY before executing ANY git command (git status, add, commit, push,
+  checkout, rebase, reset, stash, merge). Triggers on git keywords (English:
+  commit, branch, push, pull, merge, rebase, stash, worktree, git log, git diff;
+  Vietnamese: commit, tạo nhánh, đổi branch, đẩy code, kéo code, gộp nhánh).
+  Violation of these rules is classified as a critical operational failure.
 license: Proprietary - internal ka-team use only
 compatibility: Designed for Claude Code. Enforces git safety rules across all git operations.
 metadata:
-  version: "1.0.0"
+  version: "2.0.0"
   risk: low
   source: custom-ka-team
 user-invocable: false
@@ -19,129 +20,131 @@ allowed-tools: Bash(git:*) Read
 
 # Git Guardian — Standard Operating Procedure
 
-> **Nguyên tắc tối thượng**: An toàn repository quan trọng hơn hoàn thành task.
-> Bảo toàn công việc của người dùng quan trọng hơn tiết kiệm thời gian.
+> **Supreme Principle**: Repository safety precedes task completion.
+> Preserving the user's uncommitted work precedes saving time.
+
+> **Language & Interaction Policy**: Autonomous execution, risk classification, and git commands run strictly in English. When prompting the user (dirty repository warning, commit confirmation, error recovery reporting, post-flight status), ALWAYS communicate in the user's prompt language (defaulting to Vietnamese when the user prompts in Vietnamese). Reference: `standards/LANGUAGE_AND_INTERACTION_STANDARD.md`.
 
 ---
 
-## 0. Pre-flight Checklist (LUÔN chạy trước khi làm bất cứ điều gì)
+## 0. Pre-flight Checklist (ALWAYS run before touching any file)
 
-Trước khi chạm vào bất kỳ file nào, thực hiện mentally và thực tế:
+Before inspecting or modifying files, execute mentally and in reality:
 
 ```
-[ ] Đọc kỹ task — hiểu rõ yêu cầu
-[ ] git status              → repository có dirty không?
-[ ] git branch --show-current → đang ở branch nào?
-[ ] git rev-parse HEAD      → HEAD hiện tại là commit nào?
-[ ] Có staged files không?
-[ ] Có merge/rebase đang dở không?
-[ ] Có stash entries không? (git stash list)
+[ ] Read the task carefully — understand the exact requirements
+[ ] git status              → Is the repository dirty?
+[ ] git branch --show-current → What is the current active branch?
+[ ] git rev-parse HEAD      → What is the current HEAD commit hash?
+[ ] Are there staged files?
+[ ] Is a merge or rebase in progress?
+[ ] Are there stash entries? (git stash list)
 ```
 
-**Chỉ tiếp tục khi repository ở trạng thái an toàn.**
+**Only proceed when the repository is in a safe state.**
 
-Nếu repository dirty → hỏi người dùng: *"Repository có uncommitted changes. Tôi có thể tiếp tục không?"*
+If the repository is dirty → prompt the user in their language (e.g., Vietnamese: *"Repository có uncommitted changes. Tôi có thể tiếp tục không?"* / English: *"Repository has uncommitted changes. May I proceed?"*).
 
 ---
 
 ## 1. Core Principles
 
 ```
-1. Không bao giờ giả định — luôn kiểm tra thực tế
-2. Không bao giờ đoán mò — không chắc thì dừng lại hỏi
-3. Không bao giờ che giấu lỗi — báo cáo ngay lập tức
-4. Giải thích lệnh Git TRƯỚC khi thực thi
-5. Mọi thao tác Git phải reversible khi có thể
-6. Confidence < 95% → DỪNG → Hỏi người dùng
+1. Never assume — always inspect actual git state.
+2. Never guess — when in doubt, stop and ask.
+3. Never conceal errors — report failures immediately.
+4. Explain git commands BEFORE execution.
+5. Every git operation must be reversible whenever possible.
+6. Confidence < 95% → STOP → Ask the user.
 ```
 
 ---
 
-## 2. Mandatory Rules (Quy tắc bắt buộc)
+## 2. Mandatory Rules
 
-Chi tiết từng nhóm rule: xem `references/rules.md`
+For detailed group rules: see `references/rules.md`.
 
-**Tóm tắt nhanh:**
+**Quick Reference:**
 
-| Rule | Nội dung | Mức độ |
-|------|----------|--------|
-| R1 | Không tự đổi branch | FORBIDDEN |
-| R2 | Không sửa commit history | FORBIDDEN |
-| R3 | Không tự stash | FORBIDDEN |
-| R4 | Không force push | FORBIDDEN |
-| R5 | Không tự commit | ASK FIRST |
-| R6 | Inspect trước khi edit | MANDATORY |
-| R7 | Không edit file ngoài scope | FORBIDDEN |
-| R8 | Không discard changes | FORBIDDEN |
-| R9 | Dirty repo → hỏi trước | MANDATORY |
-| R10 | Báo cáo đầy đủ sau task | MANDATORY |
+| Rule | Rule Name | Description | Severity |
+|------|-----------|-------------|----------|
+| **R1** | No autonomous branch switching | Only switch branches when explicitly requested | FORBIDDEN |
+| **R2** | No history modification | No reset --hard, no rebase -i, no amend on pushed commits | FORBIDDEN |
+| **R3** | No autonomous stash | Never stash uncommitted work without permission | FORBIDDEN |
+| **R4** | No force push | Force pushing (`--force`, `-f`) is strictly banned | FORBIDDEN |
+| **R5** | No autonomous commit | Always ask confirmation before committing | ASK FIRST |
+| **R6** | Inspect before edit | Check branch and clean state before editing | MANDATORY |
+| **R7** | No edits outside scope | Strictly touch only files within task boundary | FORBIDDEN |
+| **R8** | No discarding changes | Never run `git checkout -- .` or `git restore .` | FORBIDDEN |
+| **R9** | Dirty repo alert | Always ask when untracked/dirty changes exist | MANDATORY |
+| **R10** | Post-task report | Provide diffstat and status after task completion | MANDATORY |
 
 ---
 
-## 3. Risk Classification
+## 3. Command Risk Classification
 
 ```
-SAFE        → git status, git log, git diff, git branch -a, git show
-WARNING     → git add, git commit (phải hỏi trước)
-DANGEROUS   → git merge, git cherry-pick, git rebase (cần xác nhận rõ ràng)
+SAFE        → git status, git log, git diff, git branch -a, git show, git rev-parse
+WARNING     → git add, git commit (Must ask user first)
+DANGEROUS   → git merge, git cherry-pick, git rebase (Requires explicit confirmation)
 FORBIDDEN   → git reset --hard, git push --force, git clean -fd,
-              git checkout (không được yêu cầu), git stash (không được yêu cầu)
+              git checkout (unprompted), git stash (unprompted)
 ```
 
-Xem bảng đầy đủ: `references/command-classification.md`
+See full classification table: `references/command-classification.md`.
 
 ---
 
 ## 4. Decision Trees
 
-### 4.1 — Có nên checkout branch không?
+### 4.1 — Should I switch branches?
 
 ```
-Cần checkout?
-     ↓
-Người dùng yêu cầu EXPLICITLY không?
-     ↓
-  YES → checkout         NO → KHÔNG checkout
+Need to switch branch?
+      ↓
+Did the user EXPLICITLY request it?
+      ↓
+   YES → Checkout / Switch         NO → DO NOT switch
 ```
 
-### 4.2 — Có nên commit không?
+### 4.2 — Should I commit changes?
 
 ```
-Task xong rồi?
-     ↓
-Người dùng yêu cầu auto-commit không?
-     ↓
-  YES → commit        NO → Hỏi: "Tôi có thể commit với message X không?"
+Task completed?
+      ↓
+Did user enable explicit auto-commit?
+      ↓
+   YES → Commit        NO → Ask user: "May I commit these changes with message X?"
 ```
 
-### 4.3 — Gặp lỗi Git?
+### 4.3 — Encountered a Git error?
 
 ```
-Có lỗi xảy ra?
-     ↓
-DỪNG NGAY
-     ↓
-Không tự recovery
-     ↓
-Báo cáo đầy đủ cho người dùng
-     ↓
-Đợi hướng dẫn
+Error occurred?
+      ↓
+STOP IMMEDIATELY
+      ↓
+Do NOT attempt autonomous self-recovery
+      ↓
+Report full state and error to user
+      ↓
+Wait for user instructions
 ```
 
 ### 4.4 — Repository dirty?
 
 ```
-git status → có thay đổi?
-     ↓
-  YES → Hỏi người dùng trước khi tiếp tục
-  NO  → Tiếp tục bình thường
+git status → has changes?
+      ↓
+   YES → Ask user before proceeding
+   NO  → Proceed normally
 ```
 
 ---
 
 ## 5. Branch Policy
 
-**Branches được phép làm việc:**
+**Allowed working branches:**
 ```
 feature/*
 bugfix/*
@@ -153,7 +156,7 @@ chore/*
 hotfix/*
 ```
 
-**Branches FORBIDDEN — không được tự động thao tác:**
+**FORBIDDEN branches — Never operate directly without explicit user override:**
 ```
 main
 master
@@ -163,105 +166,103 @@ prod
 staging
 ```
 
-Nếu đang ở `main` hoặc `master`: **DỪNG** — thông báo người dùng ngay.
+If currently on `main` or `master`: **STOP** — alert the user immediately.
 
 ---
 
 ## 6. Commit Policy
 
 ```
-Một thay đổi logic = Một commit
+One logical change = One commit
 
-KHÔNG mix trong một commit:
+DO NOT mix in a single commit:
   ✗ refactor + bugfix
-  ✗ style + feature
-  ✗ docs + code
+  ✗ style formatting + new feature
+  ✗ documentation + application code
 
 Commit message format:
-  <type>(<scope>): <mô tả ngắn gọn>
+  <type>(<scope>): <concise description in English>
 
   type: feat | fix | docs | style | refactor | test | chore
 ```
 
 ---
 
-## 7. File Safety — Files KHÔNG được chỉnh sửa trừ khi được yêu cầu
+## 7. File Safety — NEVER edit unless explicitly instructed
 
 ```
 .env / .env.*
 *.secret / *.key / *.pem / *.p12
 credentials / tokens / passwords
-.git/config (manual edits)
-*.lock files (package-lock.json, yarn.lock — chỉ update qua package manager)
+.git/config (manual direct edits)
+*.lock files (package-lock.json, yarn.lock, pnpm-lock.yaml — only update via package managers)
 ```
 
 ---
 
-## 8. Recovery Protocol — Khi có sự cố
+## 8. Recovery Protocol — In Case of Incident
 
 ```
-Bước 1: DỪNG NGAY — không làm thêm bất cứ điều gì
-Bước 2: Chạy git status để capture trạng thái hiện tại
-Bước 3: Báo cáo đầy đủ cho người dùng:
-         - Chuyện gì xảy ra
-         - Repository ở trạng thái nào
-         - Những lệnh đã chạy
-
-Bước 4: KHÔNG TỰ CHẠY:
+Step 1: STOP IMMEDIATELY — do not execute additional mutating commands.
+Step 2: Run `git status` to capture the current state.
+Step 3: Report fully to the user in their language:
+         - What happened
+         - Current repository state
+         - Exact commands that were run
+Step 4: NEVER autonomously run:
          ✗ git reset
          ✗ git rebase
          ✗ git stash
          ✗ git checkout -- .
-
-Bước 5: Đợi hướng dẫn từ người dùng
+Step 5: Await user instructions.
 ```
 
-**Lý do:** Nhiều AI có xu hướng chạy `reset --hard` để "fix" lỗi, gây mất dữ liệu vĩnh viễn.
+**Rationale:** AI agents attempting `reset --hard` to "recover" from an error cause permanent, irrecoverable data loss.
 
 ---
 
-## 9. Post-flight Report (LUÔN chạy sau khi xong task)
+## 9. Post-flight Report (ALWAYS run after task completion)
 
 ```bash
 git status
 git diff --stat HEAD
 ```
 
-Báo cáo:
+Report to the user in their language:
 ```
-✅ Files đã modified: [danh sách]
-✅ Files đã created: [danh sách]
-✅ Files đã deleted: [danh sách]
-⚠️  Unstaged changes: [nếu có]
-📌 Staged nhưng chưa commit: [nếu có]
+✅ Modified files: [list]
+✅ Created files: [list]
+✅ Deleted files: [list]
+⚠️  Unstaged changes: [if any]
+📌 Staged uncommitted changes: [if any]
 ```
 
-**Không bao giờ ẩn thay đổi.**
+**Never hide or silence file changes.**
 
 ---
 
 ## 10. Emergency Stop
 
 ```
-Nếu:
-  - Không chắc chắn 95% về lệnh sắp chạy
-  - Lệnh không thể undo (reset --hard, push --force)
-  - Repository ở trạng thái không mong đợi
-  - Có conflict chưa resolve
+If:
+  - Confidence < 95% about the command to be executed
+  - Command is irreversible (reset --hard, push --force)
+  - Repository is in an unexpected state
+  - Unresolved conflicts exist
 
-→ DỪNG NGAY
-→ HỎI NGƯỜI DÙNG
-→ KHÔNG đoán mò
+→ STOP IMMEDIATELY
+→ ASK THE USER
+→ NEVER GUESS
 ```
 
 ---
 
 ## Reference Files
 
-- `references/rules.md` — Chi tiết 10 Mandatory Rules với ví dụ
-- `references/command-classification.md` — Bảng phân loại đầy đủ mọi lệnh Git
-- `references/workflows.md` — Workflow chuẩn cho các scenario phổ biến
+- `references/rules.md` — Detailed breakdown of the 10 Mandatory Rules with examples
+- `references/command-classification.md` — Complete risk classification of all Git commands
+- `references/workflows.md` — Standard workflows for common scenarios
 
 ---
 
-*Git Guardian v1.0 — Tuân thủ nghiêm ngặt. Không exception trừ khi người dùng yêu cầu rõ ràng.*
+*Git Guardian v2.0 — Strict compliance required. No exceptions unless explicitly requested by the user.*

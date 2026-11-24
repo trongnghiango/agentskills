@@ -1,10 +1,14 @@
-# Git Guardian — Mandatory Rules (Chi tiết)
+# Git Guardian — Mandatory Rules (Detailed)
 
-## Rule 1 — Không tự đổi branch
+> **User Communication Convention**: When prompting the user for decisions under these rules (e.g. Rule 1, 5, 9), converse in the user's conversation language (Vietnamese when prompted in Vietnamese).
 
-**Nguyên tắc:** Chỉ đổi branch khi người dùng yêu cầu EXPLICITLY.
+---
 
-**FORBIDDEN (không có lệnh rõ ràng):**
+## Rule 1 — No Autonomous Branch Switching
+
+**Principle:** Only switch or create branches when EXPLICITLY requested by the user.
+
+**FORBIDDEN (without explicit user command):**
 ```bash
 git checkout <branch>
 git switch <branch>
@@ -13,15 +17,15 @@ git switch -c <new-branch>
 git worktree move
 ```
 
-**ALLOWED khi người dùng nói:** *"Chuyển sang branch feature/xyz"*, *"Tạo branch mới tên abc"*
+**ALLOWED when the user says:** *"Switch to branch feature/xyz"*, *"Create a new branch named abc"* (or in Vietnamese: *"chuyển sang branch abc"*, *"tạo nhánh mới"*).
 
-**Lý do:** Đổi branch có thể mang theo untracked changes, gây conflict không mong muốn, hoặc làm người dùng mất định hướng.
+**Rationale:** Switching branches carries uncommitted changes across branches, causes unexpected merge conflicts, and disorients the user.
 
 ---
 
-## Rule 2 — Không sửa commit history
+## Rule 2 — No History Rewriting
 
-**FORBIDDEN tuyệt đối (trừ khi yêu cầu cực kỳ rõ ràng):**
+**Strictly FORBIDDEN:**
 ```bash
 git rebase
 git rebase -i
@@ -35,13 +39,13 @@ git filter-branch
 git filter-repo
 ```
 
-**Lý do:** Rewrite history trên shared branch phá vỡ repository của toàn team.
+**Rationale:** Rewriting history on shared branches disrupts collaborators' local states and damages repository integrity.
 
-**Ngoại lệ:** Chỉ chấp nhận khi người dùng nói rõ ràng branch là local, chưa push, và họ hiểu hậu quả.
+**Exception:** Permissible ONLY if the user explicitly specifies that the branch is local, unpushed, and acknowledges the risks.
 
 ---
 
-## Rule 3 — Không tự stash
+## Rule 3 — No Autonomous Stashing
 
 **FORBIDDEN:**
 ```bash
@@ -53,15 +57,15 @@ git stash drop
 git stash clear
 ```
 
-**Lý do:** Stash ẩn công việc của người dùng. Nếu AI tự stash rồi quên báo cáo, người dùng sẽ mất track thay đổi.
+**Rationale:** Stashing hides the user's ongoing work into an opaque stack. If the agent stashes and forgets to pop/report, work becomes orphaned.
 
-**Thay thế:** Nếu cần "dọn" working tree, hãy hỏi người dùng muốn làm gì với những thay đổi hiện tại.
+**Alternative:** If working tree cleanup is required, ask the user in their language what to do with the active modifications.
 
 ---
 
-## Rule 4 — Không force push
+## Rule 4 — No Force Pushing
 
-**FORBIDDEN tuyệt đối:**
+**Strictly FORBIDDEN:**
 ```bash
 git push --force
 git push -f
@@ -69,58 +73,58 @@ git push --force-with-lease
 git push --force-if-includes
 ```
 
-**Lý do:** Force push có thể xóa commits của người khác trên shared branch vĩnh viễn.
+**Rationale:** Force pushing can permanently erase commits from remote team branches.
 
-**Không có ngoại lệ** — ngay cả khi người dùng nói "force push đi" mà không giải thích lý do, hãy xác nhận lại và cảnh báo rõ rủi ro.
+**No Exceptions:** Even if the user says "just force push", re-confirm explicitly and highlight the severe data-loss hazard before proceeding.
 
 ---
 
-## Rule 5 — Không tự commit
+## Rule 5 — No Autonomous Commits
 
-**Quy trình đúng:**
+**Standard Flow:**
 ```
-Task xong
-  ↓
-Chạy git status + git diff
-  ↓
-Hỏi người dùng: "Tôi có thể commit với message '[type]: [mô tả]' không?"
-  ↓
-Đợi xác nhận
-  ↓
+Task complete
+      ↓
+Run `git status` + `git diff`
+      ↓
+Ask user: "May I commit these changes with message '[type]: [description]'?"
+(In Vietnamese if user is Vietnamese: "Tôi có thể commit với message '...' không?")
+      ↓
+Wait for user confirmation
+      ↓
 git commit -m "..."
 ```
 
-**Ngoại lệ:** Nếu người dùng đã nói từ đầu *"tự động commit sau mỗi thay đổi"* thì được phép — nhưng vẫn phải báo cáo message sẽ dùng.
+**Exception:** Permissible only if the user explicitly gave prior instruction to auto-commit each change. Even then, report the commit message and hash immediately.
 
 ---
 
-## Rule 6 — Inspect trước khi edit
+## Rule 6 — Inspect Before Editing
 
-**Bắt buộc chạy trước khi chỉnh sửa bất kỳ file nào:**
+**MANDATORY inspection before modifying any repository file:**
 ```bash
 git status
 git branch --show-current
 git rev-parse HEAD
-git log --oneline -5    # optional nhưng recommended
 ```
 
-**Output phải được đọc và xử lý** — không chỉ chạy cho có.
+Confirm that the active branch is a valid working branch (not `main` or `master`) and that existing uncommitted changes are acknowledged.
 
 ---
 
-## Rule 7 — Không edit files ngoài scope
+## Rule 7 — No Editing Outside Scope
 
-**Chỉ sửa files được yêu cầu trong task.**
+**Principle:** Touch only files directly relevant to the assigned task.
 
-Ví dụ: Task là *"sửa bug trong auth.py"* → không được sửa thêm `utils.py` hay `config.py` dù thấy code xấu.
-
-**Ngoại lệ:** Nếu phát hiện file liên quan cần sửa, báo cáo và hỏi trước: *"Tôi thấy X cũng cần sửa để fix bug này. Tôi có thể sửa thêm không?"*
+- Do not reformat unrelated files.
+- Do not refactor files outside the task scope.
+- Do not remove existing comments or TODOs in surrounding files.
 
 ---
 
-## Rule 8 — Không discard changes
+## Rule 8 — Never Discard Working Tree Changes
 
-**FORBIDDEN:**
+**Strictly FORBIDDEN:**
 ```bash
 git checkout -- .
 git checkout -- <file>
@@ -128,52 +132,30 @@ git restore .
 git restore <file>
 git clean -fd
 git clean -fx
-git clean -fxd
-git reset --hard
 ```
 
-**Lý do:** Những lệnh này xóa công việc của người dùng không thể khôi phục (trừ reflog trong một số trường hợp).
-
-**Nếu cần clean:** Hỏi rõ ràng người dùng từng file/thư mục cụ thể.
+**Rationale:** These operations permanently delete uncommitted code with zero chance of recovery.
 
 ---
 
-## Rule 9 — Dirty repository → hỏi trước
+## Rule 9 — Alert on Dirty Repository
 
-**Quy trình:**
-```
-git status → có thay đổi chưa commit?
-  ↓
-Thông báo: "Repository hiện có uncommitted changes:
-  [liệt kê files]
-Tôi có thể tiếp tục không? Những thay đổi này sẽ không bị ảnh hưởng."
-  ↓
-Đợi người dùng xác nhận
-```
-
-**Không tự ý tiếp tục** dù task có vẻ không liên quan đến những changes đó.
+**MANDATORY:** If `git status` reveals untracked or unstaged files before starting work:
+- Do NOT silently ignore or stash them.
+- Prompt the user in their language: *"Repository currently has uncommitted changes. Would you like me to proceed?"* (e.g., *"Repository có uncommitted changes. Tôi có thể tiếp tục không?"*).
 
 ---
 
-## Rule 10 — Báo cáo đầy đủ sau task
+## Rule 10 — Post-Task Report
 
-**Sau khi hoàn thành mọi task có liên quan đến files:**
+**MANDATORY:** After completing work, run:
 ```bash
 git status
 git diff --stat HEAD
 ```
 
-**Báo cáo bắt buộc:**
-```
-📁 Thay đổi trong task này:
-  Modified:  [danh sách]
-  Created:   [danh sách]
-  Deleted:   [danh sách]
-  Untracked: [danh sách nếu có]
-
-💾 Trạng thái staging:
-  Staged:    [danh sách nếu có]
-  Unstaged:  [danh sách nếu có]
-```
-
-**Không được ẩn bất kỳ thay đổi nào**, kể cả thay đổi nhỏ như sửa whitespace.
+Present an honest summary in the user's language:
+- Modified files
+- Created files
+- Deleted files
+- Unstaged / staged status
