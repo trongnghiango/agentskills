@@ -45,8 +45,8 @@ All outward-facing communications must strictly adapt to the **user's chosen lan
 | Workflow Stage | Component / Skill | Internal Processing | User-Facing Output |
 |---|---|---|---|
 | **Intake** | `ka-intake` | Checklist validation in EN | Batched questions in User Language (VI/EN) |
-| **Design** | `ka-plan` / `ka-think` | Architectural reasoning in EN; writes `decisions.json` in EN | D1-D5 Socratic dialogue & summaries in User Language |
-| **Routing** | `ka-execute` | Schema validation & payload in EN | Risk-tier confirmation prompt in User Language |
+| **Design** | `ka-plan` (incl. `ka-think` alias) | Architectural reasoning in EN; writes `decisions.json` in EN | Mode E/Q/D/A dialogue & summaries in User Language |
+| **Lifecycle & Routing** | `ka-workflow` (incl. `ka-execute` alias) | State transitions, schema validation & payloads in EN | Gate & risk-tier confirmation prompts in User Language |
 | **Git Safety** | `git-guardian` | Command risk evaluation in EN | Warning prompts & pre/post-flight reports in User Language |
 | **Implementation** | `ka-be`, `ka-fe`, `ka-db-schema`, `ka-ops`, `ka-test` | Code, tests, and configuration in EN | Task status summary in User Language |
 | **Review & Audit** | `ka-review` | AST/pattern grep analysis in EN | Code review report in User Language |
