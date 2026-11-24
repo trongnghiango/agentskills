@@ -1,6 +1,6 @@
 # Option Schemas
 
-Each action's `options` JSON is validated at Step 4b **before** routing. Reject and re-prompt on any missing required field or wrong type — never forward a payload the target skill wasn't designed to receive.
+Each action's `options` JSON is validated at Execute Step 2 (`ka-workflow` §4) **before** routing. Reject and re-prompt on any missing required field or wrong type — never forward a payload the target skill wasn't designed to receive.
 
 ```json
 {
@@ -54,4 +54,4 @@ Each action's `options` JSON is validated at Step 4b **before** routing. Reject 
 }
 ```
 
-If a `custom` action is added to the Routing Table in `SKILL.md`, add its schema here in the same shape before enabling it — an action without a schema entry must be rejected at Step 4b rather than passed through unchecked.
+If a `custom` action is added to the routing table in `ka-workflow` §4, add its schema here in the same shape before enabling it — an action without a schema entry must be rejected at Step 2 rather than passed through unchecked.

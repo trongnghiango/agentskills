@@ -1,40 +1,70 @@
 # Gates — Full Descriptions
 
-For each gate, `ka-workflow` is responsible for *presenting* it; the underlying risk decision for build/deploy actions still comes from `ka-execute`'s risk-tier table (see `ka-execute/references/option-schemas.md`), not from this list alone.
+Gates are enforced by `.agents/scripts/state-manager.js`, not by prompt discipline alone:
 
-* **`ADR_APPROVAL_ON_COMPLEX`**: if `route === 'COMPLEX_MODE'`, halt and 🛑 ask the user to review and sign off on the ADR/technical design document produced by `ka-plan`.
-* **`BE_REVIEW_GATE`**: after `ka-execute` completes a backend action, 🛑 present the Code Review Walkthrough. Verify it contains a **Security & Isolation Code Diff** section before letting the user approve the transition to verify.
-* **`BE_FE_GATE_ON_UI`**: if the backend walkthrough proposes transition key `success_with_ui` toward `FE_PLANNING`, 🛑 confirm the walkthrough's Security & Isolation section exists before asking for approval.
-* **`TEST_EVIDENCE_GATE`**: sau khi `ka-test`/developer hoàn tất thay đổi, 🛑 yêu cầu evidence trước khi cho sang `BUILD_DONE`: (1) lệnh test đã chạy, (2) output RED trước khi sửa (dán nguyên văn dòng fail), (3) output GREEN sau khi sửa, (4) danh sách case + coverage delta. Feature mới hoặc bug fix thiếu mục (2) → FAIL, quay về `BLOCKED` với `RESUME_TEST`. Xem `skills/ka-test/references/tdd-loop.md`. **Enforced**: `state-manager.js` đọc `requires` của state trong `workflow.json` và từ chối `PASS` nếu thiếu `--evidence`; thiếu field → exit 2.
-* **`DEPLOYMENT_GATE`**: before invoking `ka-execute` for an `ops` action, 🛑 present the ops plan: *"Infrastructure package ready. Deploy to staging?"* This is in addition to, not instead of, `ka-execute`'s own tier-4 confirmation (type-to-confirm + rollback acknowledgement). The user confirms twice for deploys — once at the workflow level, once at the execute level. This redundancy is intentional for the highest-risk action in the system.
-* **`COMPLETION_GATE`**: before transitioning to `READY_TO_ARCHIVE`, 🛑 display the E2E walkthrough and ask: *"Confirm feature completion and archive?"*
-* **`BLOCKER_RESOLUTION_GATE`**: when state transitions to `BLOCKED` (retry limit exceeded or deploy failure), freeze execution, display the blockers, and wait for:
+| Mechanism | workflow.json field | What the script checks | Exit code on refusal |
+|---|---|---|:-:|
+| Human approval | `"approval": "human"` (optionally `approval_for`) | `--approved-by-user "<user reply, verbatim>"` present; appended to `.agents/memory/approvals.log` | 4 |
+| Test evidence | `"verify": "test_runs"` | a RED run (exit ≠ 0) and a later GREEN run (exit 0) that **the script itself executed** via `state-manager.js test` | 2 / 3 |
+
+> [!IMPORTANT]
+> `--approved-by-user` must contain the user's actual reply. Never fill it from your own inference, a previous turn, or a generic "approved". The audit log makes fabricated approvals visible in review; treat a fabricated approval as a drift incident.
+
+## Gate list
+
+* **`ADR_APPROVAL_ON_COMPLEX`** (state `ADR_GATE`, human): when `route == COMPLEX_MODE`, present the ADR (`docs/adr/ADR-<n>-<slug>.md`, template in `../ka-plan/templates/ADR.md`). An ADR without "Options considered" or "Consequences" is not approvable.
+* **`TEST_EVIDENCE_GATE`** (state `TEST_GATE`, script-verified): every build action (`EXECUTE_BE/FE/SCHEMA/CONTRACT/TEST`) lands here — there is no path from build to review that skips tests.
   ```bash
-  node .agents/scripts/state-manager.js update --proposal [resume_be | resume_patch | resume_fe | rollback_to_design] --reset-retries
+  node .agents/scripts/state-manager.js test --feature <slug> --phase red   --cmd "pnpm vitest run src/orders"   # must fail
+  # ...implement...
+  node .agents/scripts/state-manager.js test --feature <slug> --phase green --cmd "pnpm vitest run src/orders"   # must pass
+  node .agents/scripts/state-manager.js update --feature <slug> --proposal PASS --cases "cancel delivered order; cancel twice"
   ```
-  **Limit: at most 3 resets per state per feature.** On the 4th consecutive failure for the same state, do not offer `--reset-retries` again — report that the state appears structurally blocked and recommend returning to `ka-plan` to re-examine the design instead of retrying execution.
+  No RED is possible (pure refactor, config, docs, styling)? Use `--skip-red "<reason>"` **with** `--approved-by-user`. A RED run recorded after a GREEN run invalidates that GREEN. See `../ka-test/references/tdd-loop.md`.
+* **`REVIEW_GATE`** (human): present the walkthrough/diff (backend: must contain the **Security & Isolation Code Diff** section). Transitions: `APPROVE`/`SUCCESS_NO_UI` → `BUILD_DONE`, `SUCCESS_WITH_UI` → `BE_FE_GATE_ON_UI`, `REQUEST_CHANGES` → `LOCKED_DECISION`. In `full` profile run a `ka-review` pass before presenting.
+* **`BE_FE_GATE_ON_UI`** (human): approve starting frontend work. `APPROVE` → `LOCKED_DECISION` (then `EXECUTE_FE`), `SKIP_UI` → `BUILD_DONE`.
+* **`DEPLOYMENT_GATE`** (human): every `ops` action passes here, including `EXECUTE_OPS` straight from `LOCKED_DECISION`. Present env + rollback plan; this is in addition to the tier-4 type-to-confirm in the Execute stage of `ka-workflow`.
+* **`COMPLETION_GATE`** (human): show the final walkthrough; `APPROVE` → `READY_TO_ARCHIVE`, `REQUEST_CHANGES` → `LOCKED_DECISION`.
+* **`BLOCKER_RESOLUTION_GATE`** (state `BLOCKED`, human): entered after 3 `FAILURE` proposals in one state, a failed deploy, or a `FAIL` at the test gate. Resume with
+  ```bash
+  node .agents/scripts/state-manager.js update --feature <slug> --proposal RESUME_PATCH --reset-retries --approved-by-user "<reply>"
+  ```
+  **Max 3 resets per state per feature.** The 4th reset returns the feature to the initial state — re-examine the design instead of retrying.
 
-## Transition Keys Reference
+## Batching human gates (practicality)
 
-All `next_state_proposal` keys used by worker skills and consumed by `ka-workflow`:
+Human gates exist to get a decision, not to generate turns. When two gates are adjacent and nothing changes between them, present them in **one** message and apply both transitions with the same reply:
+
+| Situation | One message covers |
+|---|---|
+| PATCH / fast-track with no UI and no deploy | `REVIEW_GATE` + `COMPLETION_GATE` |
+| Backend done, UI already agreed in the plan | `REVIEW_GATE (SUCCESS_WITH_UI)` + `BE_FE_GATE_ON_UI` |
+
+Never batch `ADR_GATE`, `DEPLOYMENT_GATE`, or `BLOCKER_RESOLUTION_GATE` with anything else.
+
+## Transition keys reference
 
 | Key | Proposed by | Meaning |
-|-----|-------------|---------|
-| `success` | ka-plan, ka-contract, ka-db-schema, ka-fe, ka-review, ka-ops | Stage completed successfully. |
-| `success_with_ui` | ka-be | Backend completed; frontend work is required next. Routes through `BE_FE_GATE_ON_UI`. |
-| `success_no_ui` | ka-be | Backend completed; no frontend work needed. Skips `FE_PLANNING`. |
-| `test_pass` | ka-test | Evidence hợp lệ; gate chuyển `BUILD_DONE`. |
-| `failure` | ka-be, ka-fe, ka-ops, ka-review | Stage failed verification. Triggers retry logic; may escalate to `BLOCKER_RESOLUTION_GATE` after retry limit. |
+|---|---|---|
+| `PLAN_PATCH` / `PLAN_STANDARD` / `PLAN_COMPLEX` / `PLAN_FAST_TRACK` | ka-plan | Decision locked at that scale |
+| `EXECUTE_BE` / `EXECUTE_FE` / `EXECUTE_SCHEMA` / `EXECUTE_CONTRACT` / `EXECUTE_TEST` | ka-workflow (Execute stage) | Worker finished; go verify tests |
+| `EXECUTE_OPS` | ka-workflow (Execute stage) | Ops requested; go to deployment gate |
+| `PASS` / `FAIL` | ka-test / worker | Test gate result |
+| `APPROVE` / `REJECT` / `REQUEST_CHANGES` | user, via the agent | Human gate decision |
+| `SUCCESS_WITH_UI` / `SUCCESS_NO_UI` | ka-be (approved by user) | Review approved, with/without UI follow-up |
+| `NEXT_STEP` | ka-workflow | More build work in the same feature |
+| `FAILURE` | any worker | Counts a retry; 3 → `BLOCKED` |
 
-When adding a new worker skill, register its transition keys in this table and in `workflow.json` state definitions.
+When adding a worker skill, register its keys here and in `workflow.json`.
 
----
+## Profiles
 
-## Changelog from 4.2.0 → 5.0.0
+| Profile | File | States | Use for |
+|---|---|---|---|
+| `full` | `runtime-templates/workflow.json` | design → ADR → build → test → review → deploy → completion | multi-module products, money/auth/tenant data |
+| `lite` | `runtime-templates/workflow.lite.json` | in-progress → test → completion (+ deploy gate) | small repos, scripts, solo work |
 
-- **Removed** direct routing to `ka-be`, `ka-fe`, `ka-db-schema`, `ka-test`, `ka-ops` — all execution now goes through `ka-execute`. Two orchestrators independently deciding when a worker skill is safe to invoke was a design conflict, not a feature.
-- **Removed** "Auto-executing" default behavior. Every transition now traces back to either a `ka-plan` lock or a `ka-execute`/gate confirmation.
-- **Fixed** worker list: added `ka-contract` and `ka-review` (as corresponding skill definitions are now fully implemented), added `ka-test`, renamed `ka-think` references to `ka-plan`.
-- **Fixed** `risk` metadata from `low` to `high` — this skill can reach `DEPLOYMENT_GATE` and controls transitions toward production changes.
-- **Added** a 3-reset cap on `BLOCKER_RESOLUTION_GATE`'s `--reset-retries`, matching the retry-limit pattern in `ka-execute`.
-- **5.0.0**: restructured frontmatter for agentskills.io spec compliance — removed non-standard `auto-trigger-keywords` field (keywords folded into `description`), moved long content to `references/` and `assets/`, added `license`, `compatibility`, `allowed-tools`.
+## Changelog
+
+- **6.0.0**: human gates require `--approved-by-user` + audit log; test gate accepts only script-executed runs (`--evidence` removed); every build action goes through `TEST_GATE`; `EXECUTE_OPS` can no longer skip `DEPLOYMENT_GATE`; `BE_REVIEW_GATE` → `REVIEW_GATE`; per-feature state (`--feature`); `lite` profile; gate batching rules.
+- **5.0.0**: all execution routed through a single router; 3-reset cap on `BLOCKER_RESOLUTION_GATE`.

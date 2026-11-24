@@ -1,100 +1,27 @@
 ---
 name: ka-execute
-description: "Execution router. Takes a locked decision from ka-plan (or asks directly) and forwards a schema-validated action to the matching worker (ka-be, ka-fe, ka-db-schema, ka-contract, ka-test, ka-ops) with risk-tiered confirmation. Never edits files itself. Use when the user wants to run, deploy, apply, execute, launch, or trigger backend/frontend/schema/contract/test/ops work. Do NOT use for design (ka-plan)."
+description: "Alias (deprecated since 6.0) for the Execute stage of ka-workflow. Use when the user explicitly types /ka-execute <action> '<json>'. Do NOT use for natural-language requests — ka-workflow handles those directly."
 license: Proprietary - internal ka-team use only
-compatibility: Designed for DeepSeek Harness (DSH). Requires the `Skill` tool to route to target skills, and reads `.agents/memory/decisions.json` when present.
+compatibility: Host-agnostic. Delegates entirely to ka-workflow §4 (Execute stage).
 metadata:
-  version: "1.5.0"
+  version: "2.0.0"
   risk: medium
   source: custom-ka-team
 user-invocable: true
 ---
 
-# Ka Execute – Orchestration / Routing Skill
+# ka-execute → ka-workflow (alias)
 
-> **Language & Interaction Policy**: Routing, schema validation, and skill payloads run in English. User-facing interactions (handoff confirmations, risk-tier prompts, and execution summaries) MUST match the user's prompt language (Vietnamese when prompted in Vietnamese). Reference: `standards/LANGUAGE_AND_INTERACTION_STANDARD.md`.
+`ka-execute` was merged into `ka-workflow` in 6.0 to remove one hand-off and one confirmation per action. This alias keeps existing commands working.
 
-## Purpose
-Dispatches `ka-plan` outcomes, or a directly-specified action, to the appropriate concrete implementation skill. **Never** edits repository files itself; it only forwards validated arguments via the `Skill` tool and returns the target skill's response.
+When invoked as `/ka-execute <action> '<options-json>'`:
 
-## Interaction Flow (Hard Stops)
+1. Load `ka-workflow` (skill tool, `/ka-workflow`, or `../ka-workflow/SKILL.md`).
+2. Run its **§4 Execute stage** with the given action/options as Step 1 input: validate against `../ka-workflow/references/option-schemas.md`, apply the risk tier (tier 3–4 always stop for confirmation — no mode skips this), route to the worker.
+3. Afterwards, propose the matching `EXECUTE_<ACTION>` transition with `state-manager.js --feature <slug>`.
 
-### Step 0 — Check for a Locked Handoff
-Look for the most recent `.agents/memory/decisions.json` entry where `status == "locked"` and no `consumed_at` field is present.
-
-- **Not found** → proceed to Step 1 as normal.
-- **Found** → 
-  - *Fast-Track Autonomous Mode* (khi `decision.fast_track == true` hoặc đang chạy trong active DSH goal): Tự động adopt `action`/`options`/`risk_tier` và chuyển thẳng sang Step 4b/Step 6 mà không cần hỏi lại.
-  - *Interactive Mode*: present it:
-```
-🗣️ Tìm thấy quyết định đã chốt từ ka-plan:
-"<decision.summary>"
-→ Action đề xuất: <execution_hint.action>
-→ Options đề xuất: <execution_hint.options>
-→ Risk tier: <execution_hint.risk_tier>
-Dùng luôn thông tin này? (yes / no, tôi muốn nhập lại từ đầu)
-```
-🛑 **HARD STOP**. On `yes`, adopt `action`/`options`/`risk_tier` and skip to Step 4b. On `no`, discard the handoff and continue at Step 1.
-
-Once Step 7 completes and a handoff was used, write `consumed_at: <ISO timestamp>` back into that entry so it isn't re-offered.
-
-### Steps 1–4 — Ask directly (only reached if no handoff was used or accepted)
-1. **Ask for Action**: `Which action do you want to execute? Options: backend, frontend, schema, contract, test, ops` 🛑 **HARD STOP**.
-2. **Validate Action**: if unsupported, reply `❌ Unknown action: <action>. Supported: backend, frontend, schema, contract, test, ops.` 🛑 **HARD STOP**, retry. After 3 consecutive invalid replies: `Execution cancelled — no valid action provided after 3 attempts.`
-3. **Ask for Options**: `Please provide a JSON object with the options for <action>.` 🛑 **HARD STOP**.
-4. **Parse Options**: on failure, `⚠️ Could not parse options as JSON. Send a valid JSON object.` 🛑 **HARD STOP**, retry. After 3 consecutive failures: `Execution cancelled — could not obtain valid JSON after 3 attempts.`
-
-### Step 4b — Validate Against Schema
-Validate the parsed (or handoff-provided) options against the per-action schema in `references/option-schemas.md`. This check applies unconditionally — a handoff's `execution_hint.options` is not exempt.
-```
-⚠️ Missing/invalid field(s) for `<action>`: <field1>, <field2>. Expected: <schema summary>.
-```
-🛑 **HARD STOP** on failure; re-prompt for corrected JSON.
-
-### Step 5 — Risk-Tiered Confirmation
-Look up the risk tier (`execution_hint.risk_tier` if from a handoff, otherwise the default in the Routing Table below).
-
-| Tier | Confirmation |
-|---|---|
-| 1–2 | Simple: `Execute <action> with these options? (yes/no)` |
-| 3 | Must type the action name back exactly — plain "yes" is not accepted. |
-| 4 | Must type the action name back **and** explicitly confirm environment + rollback plan before proceeding. |
-
-🛑 **HARD STOP** at the applicable format. Anything else → `Execution cancelled.`
-
-### Step 6 — Route to Target Skill
-```typescript
-if (action === 'backend')  await Skill({skill: 'ka-be', args: JSON.stringify(options)});
-if (action === 'frontend') await Skill({skill: 'ka-fe', args: JSON.stringify(options)});
-if (action === 'schema')   await Skill({skill: 'ka-db-schema', args: JSON.stringify(options)});
-if (action === 'contract') await Skill({skill: 'ka-contract', args: JSON.stringify(options)});
-if (action === 'test')     await Skill({skill: 'ka-test', args: JSON.stringify(options)});
-if (action === 'ops')      await Skill({skill: 'ka-ops', args: JSON.stringify(options)});
-```
-Prefix any error from the target skill with `⚠️` and forward it.
-
-### Step 7 — Return Response
-Pass the target skill's output verbatim back to the user. If a handoff was used, write `consumed_at` as described in Step 0.
-
-## Routing Table
-
-| Action | Target Skill | Default Risk Tier |
-|---|---|---|
-| backend | ka-be | 2 |
-| frontend | ka-fe | 1 |
-| schema | ka-db-schema | 3 |
-| contract | ka-contract | 2 |
-| test | ka-test | 1 |
-| ops | ka-ops | 4 |
-| *custom* | *add-your-skill* | *assign explicitly — never default to tier 1* |
-
-Full option schemas per action live in `references/option-schemas.md`. Eval prompts for testing this flow live in `references/eval-cases.md`.
-
-## Diagram
-
-See `../ka-workflow/assets/architecture-overview.mermaid` for how `ka-execute` fits between `ka-plan` and the worker skills.
+Behavior must be identical to running `ka-workflow` directly. If the two ever disagree, `ka-workflow` wins.
 
 ## References
-- `references/option-schemas.md` — JSON schema per action, used at Step 4b.
-- `references/eval-cases.md` — should-trigger and validation test prompts.
-- `ka-plan` — produces the `decisions.json` handoff consumed at Step 0.
+- `../ka-workflow/SKILL.md` — §4 Execute stage (source of truth).
+- `references/eval-cases.md` — alias evals (explicit `/ka-execute` invocations).

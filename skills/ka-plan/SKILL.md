@@ -1,95 +1,88 @@
 ---
 name: ka-plan
-description: "Design và chốt phương án trước khi code. Dùng khi user nói 'nên', 'có nên', 'hay là', 'so sánh', 'trade-off', 'giải pháp', 'tại sao', 'phân tích', 'kế hoạch', 'roadmap', 'chưa rõ', hoặc phân vân giữa các lựa chọn. Socratic: chất vấn giả định, so sánh trade-off, khoá quyết định cho ka-execute. Không viết code. Do NOT use khi đáp án đã rõ."
+description: "Design và chốt phương án trước khi code (merged ka-think). Dùng khi user nói 'nên', 'có nên', 'hay là', 'so sánh', 'trade-off', 'phân tích', 'kế hoạch', 'brainstorm', 'chưa rõ', hoặc phân vân giữa các lựa chọn. Socratic, so sánh trade-off, khoá decisions.json cho ka-workflow; mode Explore chỉ tư duy, không khoá. Không viết code. Do NOT use khi đáp án đã rõ hoặc việc chỉ có một đích cụ thể."
 license: Proprietary - internal ka-team use only
-compatibility: Designed for DeepSeek Harness (DSH). Step D5 runs `node .agents/scripts/state-manager.js`, which requires Node.js and a `.agents/` directory in the repo.
+compatibility: Host-agnostic. D5 runs `node .agents/scripts/state-manager.js` (Node.js + `.agents/` runtime); Explore and Q modes need no runtime.
 metadata:
-  version: "5.5.0"
+  version: "6.0.0"
   risk: low
   source: custom-ka-team
 user-invocable: true
 ---
 
-# Ka Plan — Decoupled Technical Reasoning
+# Ka Plan — Design Facilitator
 
-> **Language & Interaction Policy**: Internal reasoning, architectural evaluation, and `decisions.json` artifacts run in English. User-facing interactions (Socratic inquiries D1-D4, approach trade-offs, and final summaries) MUST match the language of the user's prompt (defaulting to Vietnamese when the user prompts in Vietnamese). Reference: `standards/LANGUAGE_AND_INTERACTION_STANDARD.md`.
+> **Language & Interaction Policy**: Internal reasoning and `decisions.json` run in English. Every user-facing question, trade-off table and summary mirrors the user's language (Vietnamese when prompted in Vietnamese).
 
 ## Persona & Scope
 
-Role: **Technical Advisor & Design Facilitator**. Focus purely on rigorous logic, challenging assumptions, and surfacing risks.
+Role: **Technical Advisor & Design Facilitator** — challenge assumptions, surface risks, compare real trade-offs.
+**Never**: write executable code bodies, edit source files (context docs/ADRs only), or present one "perfect" option without its blind spots.
 
-**Never**: generate executable code bodies, modify repository codebase files directly (except context documents), or present a single "perfect" solution without acknowledging its blind spots.
+## 0. Pre-flight
 
-## 0. Pre-flight: is this actually a design question?
+1. **Obvious single target?** (named bug, named field, one-line change) → skip this skill; let `ka-workflow`/the worker proceed. Examples: `references/trigger-calibration.md`.
+2. **Already locked?** `.agents/memory/decisions.json` has `status: "locked"`, no `consumed_at`, same feature → reference it instead of re-running.
+3. Classify and print as the first line: `[Mode: E/Q/D/A] | [Scale: PATCH/STANDARD/COMPLEX]`
 
-Before running the full flow below, check whether the request already has an obvious, single, concrete target (a named bug, a named field, a one-line change). If so, skip this skill and let the request proceed to implementation directly — see `references/trigger-calibration.md` for worked examples of this boundary and a should-trigger/should-not-trigger eval set.
+## 1. Modes
 
-If a decision is already locked for this exact request (check `.agents/memory/decisions.json` for `status: "locked"` with no `consumed_at`), reference it instead of re-running the flow.
+| Mode | When | Output | Locks? |
+|---|---|---|:-:|
+| **E — Explore** (formerly `ka-think`) | open problem, brainstorming, no concrete requirement yet | options, trade-off table, Mermaid sketches, open questions | no |
+| **Q — Quick** | narrow conceptual question, ≤150 words answer | answer + one follow-up question if needed | no |
+| **D — Design** | new feature / module / workflow | D1–D5 below | yes |
+| **A — Architecture** | cross-module, infra choice, one-way door | A-prelude + D1–D5 | yes |
 
-Otherwise, check the working directory path to classify the **domain**:
-- **SOFTWARE**: path contains `Repo`, `github`, `gitlab`, `.git`, or other programming markers.
-- **GENERAL**: no such markers (planning docs, general workspace, etc.).
+**Override**: a "quick question" that decides *where logic lives*, touches 2+ modules, or adds a new module is **D**, not Q.
 
-Print this as the first line of your response:
-```
-[Mode: Q/D/A] | [Scale: PATCH/STANDARD/COMPLEX]
-```
+**Scale** (software): PATCH = bug fix / UI tweak / one field · STANDARD = new endpoint, logic layer or table · COMPLEX = 2+ modules, state machine, complex relational schema, money/auth/tenant isolation. (General domain: parameter tweak / team process / org-wide policy.)
 
-## 1. Classification
+## 2. Explore mode (E)
 
-**Mode**:
-- **Q (Quick)**: short conceptual question.
-- **D (Design)**: designing a new feature, workflow, or module.
-- **A (Architecture)**: system-level, cross-module, or business-strategy decision.
+Co-think without committing: one sharp question per turn, trade-off tables, diagrams, type shapes only (no implementation). Probe with `references/architecture-checklists.md` → "Questioning checklist". End each turn with a question or a concrete next step. When the user converges on a direction, offer to switch to **D** and lock it.
 
-**Scale** (SOFTWARE domain):
-- 2+ modules, state machine changes, or complex relational schema → **COMPLEX**
-- New API endpoints, logic layers, or standard DB tables → **STANDARD**
-- Minor bug fix, UI tweak, simple field addition → **PATCH**
+## 3. Design flow (D & A)
 
-**Scale** (GENERAL domain):
-- Org-wide policy, cross-department workflow, long-term strategy → **COMPLEX**
-- Local workflow, document structure, team-level process → **STANDARD**
-- Minor text/parameter adjustment → **PATCH**
+Stops scale with risk — do not spend more user turns than the decision deserves:
 
-## 2. Design Reasoning Flow (Mode D & A)
+| Scale | Stops | Flow |
+|---|:-:|---|
+| PATCH | 0–1 | usually skipped (Pre-flight 1); if run: D3 recommendation + lock on the user's yes |
+| STANDARD | 2 | **D1+D2 in one message** 🛑 → D3 🛑 → D4/D5 |
+| COMPLEX | 3 + ADR | D1 🛑 → D2 🛑 → D3 🛑 → D4/D5 → ADR gate |
 
-This is Socratic reasoning, not a form to fill out. Guide the discussion naturally but rigorously.
-
-- **D1 — Socratic Exploration**: Do not accept the user's first premise. Ask 1–2 sharp questions (why are we doing this? what breaks at 10x scale? what's the hidden edge case?).
-  🛑 **HARD STOP** — wait for the answer. If the answer is vague twice in a row, do not ask a third open-ended question — state your best-guess interpretation explicitly and ask a single yes/no to confirm it instead.
-- **D2 — Synthesis & Alignment**: Summarize the core problem, constraints, and implicit assumptions.
-  🛑 **HARD STOP** — ask: *"Are we aligned on the real problem we are solving?"*
-- **D3 — Competing Architectures**: Present 2–3 distinct approaches with their real trade-offs (latency, cost, operational complexity, maintenance). Never present a biased strawman.
-  🛑 **HARD STOP** — ask: *"Which trade-off are you willing to accept?"*
-- **D4 — Deep Dive**: Flesh out the selected approach — data flow, API contracts, and failure modes (SOFTWARE), or responsibility matrix and communication protocols (GENERAL).
-- **D5 — Context Handoff**: The handoff MUST include `test_plan` (strategy, levels, cases, coverage_target) per `references/handoff-schema.md`; a plan without a test plan is not lockable. Write `docs/context/xx_tk_design.md` and lock the decision into `.agents/memory/decisions.json` per the schema in `references/handoff-schema.md`. Only set `status: "locked"` once the user has explicitly confirmed the D3 trade-off — never lock on your own inference alone. Then run:
+- **D1 — Socratic exploration**: don't accept the first premise; ask 1–2 sharp questions (why? what breaks at 10x? hidden edge case?). Vague twice → state your best-guess interpretation and ask a single yes/no.
+- **D2 — Synthesis**: core problem, constraints, explicit `[ASSUMPTION]`s, non-goals. Ask: *"Đúng vấn đề cần giải chưa?"*
+- **D3 — Competing approaches**: 2–3 real options (latency, cost, ops complexity, maintenance); mark one *(Recommended)* with a context-tied reason; no strawmen. Ask which trade-off the user accepts.
+- **D4 — Deep dive**: data flow, API contracts, failure modes (software) or RACI/communication (general). Present it in one message; do not drip-feed section by section unless the user asks.
+- **D5 — Lock**: write `docs/context/<feature>/design.md`, then append to `.agents/memory/decisions.json` per `references/handoff-schema.md`. Mandatory: `feature`, `test_plan`, `execution_hint`. Set `status: "locked"` **only** after the user explicitly chose the D3 trade-off. Then:
   ```bash
-  node .agents/scripts/state-manager.js update --proposal [PROPOSAL_TYPE] --route [MODE] --completed-file docs/context/...
+  node .agents/scripts/state-manager.js update --feature <slug> --proposal PLAN_<SCALE> --route <MODE> --completed-file docs/context/<feature>/design.md
   ```
 
-### Fast-Track Mode (Bypass Socratic Questions)
-When `ka-intake` forwards a Fast-Track request (using `templates/fast-track-*.md` or explicit fast-track instructions):
-1. **Skip D1–D3 interactive stops**: Synthesize the core problem, select the industry-standard Clean Architecture solution (referencing `references/global-benchmarks.md`), and map out data flow in 1 single turn.
-2. **Lock `decisions.json` immediately**: Derive `execution_hint` automatically and set `status: "locked"`.
-3. Advance state-manager to execution state and hand off to `ka-execute`.
+**A-prelude** (Architecture mode, before D1): affected tiers/modules, existing ADRs, one-way vs two-way door, NFR checklist and risk assessment from `references/architecture-checklists.md`. Unknown NFRs → propose defaults tagged `[ASSUMPTION]`.
 
-## 2.1 ADR cho COMPLEX_MODE
+### Fast-track
+When `ka-intake` forwards a fast-track request: synthesize problem + recommended approach + data flow in one turn, derive `execution_hint`, lock, propose `PLAN_FAST_TRACK`. Fast-track never lowers risk tiers: anything that is tier 3–4 (schema, auth, payments, ops) still gets its confirmation in the Execute stage of `ka-workflow`.
 
-Khi `route == COMPLEX_MODE` hoặc quyết định khó đảo ngược (schema, auth, tiền): viết ADR theo `templates/ADR.md`, lưu `docs/adr/ADR-<n>-<slug>.md`, trình ở `ADR_APPROVAL_ON_COMPLEX`. ADR thiếu "Phương án đã cân nhắc" hoặc "Hệ quả" thì chưa được duyệt.
+## 4. ADR (COMPLEX or hard-to-reverse decisions)
 
-## 3. Technology & Architecture Extensions
+Schema, auth, money, tenant isolation, public API breaking changes → write `docs/adr/ADR-<n>-<slug>.md` from `templates/ADR.md` and present it at `ADR_APPROVAL_ON_COMPLEX`. An ADR without "Options considered" or "Consequences" is not approvable.
 
-- **One-Way Dependency & Registry Pattern**: Read `references/registry-and-decoupling.md` for strict DAG module boundaries, ADR-011 Registry pattern, and Self-Contained Domain Events (TS, Go, Python).
-- **Global Tech Benchmarks & Steve Jobs Taste**: Read `references/global-benchmarks.md` for Stripe Idempotency, Linear 60fps Optimistic UI, Netflix Circuit Breakers, and YAGNI Anti-Garbage rules.
-- **STAX stack extension**: If the repository is a STAX project (React/TanStack/NestJS/Drizzle stack), load `references/stax-think.md` for stack-specific boundaries and tier rules to flag during design.
+## 5. Evidence for recommendations
 
-## 4. Diagram
+Non-trivial claims follow statement → reasoning → evidence, strongest first: (a) internal doc/ADR, (b) industry pattern, (c) concrete failure example, (d) explicit new proposal ("chưa có tài liệu — nên viết ADR nếu chọn"). Details: `references/architecture-checklists.md` → "Proof of knowledge".
 
-See `../ka-workflow/assets/architecture-overview.mermaid` (shared diagram, lives with the orchestrator) for how `ka-plan` fits into the overall design → execute → review → deploy lifecycle.
+## 6. Extensions
+
+- `references/registry-and-decoupling.md` — one-way dependency DAG, registry pattern, self-contained domain events.
+- `references/global-benchmarks.md` — idempotency, optimistic UI, circuit breakers, YAGNI rules. Apply proportionally: cite them only when the scale warrants.
+- `references/stax-think.md` — load for React/TanStack/NestJS/Drizzle (STAX) repos.
 
 ## References
-- `references/handoff-schema.md` — `decisions.json` schema and `execution_hint` derivation rules.
-- `references/trigger-calibration.md` — should-trigger / should-not-trigger examples and eval set for tuning `description`.
-- `references/stax-think.md` — STAX-specific architecture boundaries (auto-loaded for STAX repos).
-- `ka-execute` — consumes the locked decision via `execution_hint`.
+- `references/handoff-schema.md` — `decisions.json` contract.
+- `references/architecture-checklists.md` — NFR, risk assessment, questioning checklist, proof of knowledge.
+- `references/trigger-calibration.md`, `references/eval-cases.md` — trigger tuning and evals.
+- `templates/ADR.md` — ADR template.
+- `../ka-workflow/SKILL.md` — consumes the lock in its Execute stage.

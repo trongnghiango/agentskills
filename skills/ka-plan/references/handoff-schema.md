@@ -1,6 +1,6 @@
 # Handoff Schema — `decisions.json`
 
-Written by `ka-plan` at Step D5, consumed by `ka-execute` at its Step 0. This file is the contract between the two skills — treat any change to its shape as a breaking change for both.
+Written by `ka-plan` at Step D5, consumed by the Execute stage of `ka-workflow` (§4, Step 0). This file is the contract between the two skills — treat any change to its shape as a breaking change for both.
 
 ## Full schema
 
@@ -8,6 +8,8 @@ Written by `ka-plan` at Step D5, consumed by `ka-execute` at its Step 0. This fi
 {
   "version": "1.0",
   "proposal_id": "<slug>-<yyyy-mm-dd>",
+  "feature": "<feature slug — same value passed to state-manager.js --feature>",
+  "fast_track": false,
   "domain": "SOFTWARE | GENERAL",
   "mode": "Q | D | A",
   "scale": "PATCH | STANDARD | COMPLEX",
@@ -27,8 +29,8 @@ Written by `ka-plan` at Step D5, consumed by `ka-execute` at its Step 0. This fi
     "coverage_target": "<vd: domain 80% branch>"
   },
   "execution_hint": {
-    "action": "backend | frontend | schema | test | ops",
-    "options": { "...": "action-specific payload — see ka-execute/references/option-schemas.md for the exact shape each action expects" },
+    "action": "backend | frontend | schema | contract | test | ops",
+    "options": { "...": "action-specific payload — see ka-workflow/references/option-schemas.md for the exact shape each action expects" },
     "risk_tier": 1
   }
 }
@@ -37,7 +39,7 @@ Written by `ka-plan` at Step D5, consumed by `ka-execute` at its Step 0. This fi
 ## Locking rules
 
 - Only write `"status": "locked"` after the user has explicitly confirmed the D3 trade-off choice. A decision inferred by `ka-plan` alone, without that confirmation, must not be locked.
-- `consumed_at` is added later, by `ka-execute`, once the handoff has been used — `ka-plan` never sets this field itself.
+- `consumed_at` is added later, by the Execute stage of `ka-workflow`, once the handoff has been used — `ka-plan` never sets this field itself.
 
 ## `test_plan` (bắt buộc)
 
@@ -50,7 +52,7 @@ Written by `ka-plan` at Step D5, consumed by `ka-execute` at its Step 0. This fi
 
 ## Deriving `execution_hint`
 
-This is the step that lets `ka-execute` skip re-asking the user for action/options at its Step 1–4.
+This is the step that lets `ka-workflow`'s Execute stage skip re-asking the user for action/options (Step 1).
 
 **`action`** — derive from what D4 actually touches:
 | D4 touches | action |
@@ -61,14 +63,16 @@ This is the step that lets `ka-execute` skip re-asking the user for action/optio
 | New or updated test coverage | `test` |
 | Deployment, infra, or release changes | `ops` |
 
-**`options`** — assemble the concrete parameters implied by the D4 deep dive (feature name, affected files/modules, short description). The shape must satisfy the schema for that action defined in `ka-execute/references/option-schemas.md` — check it before writing `execution_hint.options`, since `ka-execute` will reject anything that doesn't validate.
+**`options`** — assemble the concrete parameters implied by the D4 deep dive (feature name, affected files/modules, short description). The shape must satisfy the schema for that action defined in `ka-workflow/references/option-schemas.md` — check it before writing `execution_hint.options`, since the Execute stage will reject anything that doesn't validate.
 
 **`risk_tier`** — default by action:
 | Action | Default tier |
 |---|---|
 | frontend, test | 1 |
-| backend | 2 |
+| backend, contract | 2 |
 | schema | 3 |
 | ops | 4 |
+
+`fast_track: true` never lowers a tier: tier 3–4 actions are always confirmed by the user.
 
 Raise the tier above these defaults if D1–D4 surfaced unusual blast radius — e.g. a `backend` change that touches auth or payments should be tier 3, not the tier-2 default.

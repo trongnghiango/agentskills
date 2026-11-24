@@ -1,72 +1,121 @@
 ---
 name: ka-workflow
-description: "Vòng đời feature orchestrator. Dùng khi cần theo dõi/tiếp tục feature qua các gate design → build → review → deploy → archive, hoặc hỏi 'đang ở đâu'. Do NOT use for việc một bước lẻ (đi thẳng ka-plan/ka-execute)."
+description: "Feature lifecycle orchestrator + execution router (merged ka-execute). Dùng khi theo dõi/tiếp tục feature qua design → build → test → review → deploy, hỏi 'đang ở đâu', hoặc chạy action backend/frontend/schema/contract/test/ops với risk tier. Do NOT use for câu hỏi thiết kế (ka-plan) hay sửa nhỏ không cần theo dõi vòng đời."
 license: Proprietary - internal ka-team use only
-compatibility: Designed for DeepSeek Harness (DSH). Requires Node.js to run `.agents/scripts/state-manager.js` and reads `.agents/config/workflow.json` for gate/state definitions.
+compatibility: Host-agnostic (DSH, Claude Code, Codex, Antigravity). Requires Node.js for `.agents/scripts/state-manager.js` and `.agents/config/workflow.json` (full or lite profile).
 metadata:
-  version: "5.0.0"
+  version: "6.0.0"
   risk: high
   source: custom-ka-team
 user-invocable: true
 ---
 
-# Master Workflow Orchestrator (ka-workflow)
+# Workflow Orchestrator & Execution Router (ka-workflow)
 
-> **Language & Interaction Policy**: State management, script execution (`state-manager.js`), and transition logs run in English. User-facing gate prompts (ADR confirmation, code review approval, deployment double-check, and status reports) MUST match the user's prompt language (Vietnamese when prompted in Vietnamese). Reference: `standards/LANGUAGE_AND_INTERACTION_STANDARD.md`.
+> **Language & Interaction Policy**: State commands, payloads and logs run in English. Every user-facing prompt (gate approvals, risk confirmations, status reports) mirrors the user's language (Vietnamese when prompted in Vietnamese).
 
-## 1. Persona & Strategy
-Role: **Chief Project Manager & Workflow Orchestrator**. Tracks the lifecycle state of a feature and hands off work to the specialists that own their domains:
+## 1. Role
 
-- **`ka-intake`** — owns requirement completeness. Runs before any of the below, triggered by the always-on rule in `AGENTS.md`, not called by `ka-workflow` directly.
-- **`ka-plan`** — owns all design/architecture reasoning. Called whenever the state machine enters a design or re-design step.
-- **`ka-execute`** — owns all execution routing (backend, frontend, schema, test, ops). Called whenever the state machine enters a build/deploy step.
+Tracks one feature's lifecycle and routes build/deploy work to worker skills. Since 6.0 it **includes the Execute stage** formerly owned by `ka-execute` (now a thin alias), removing one hand-off and one confirmation per action.
 
-`ka-workflow` never calls `ka-be`, `ka-fe`, `ka-db-schema`, `ka-test`, or `ka-ops` directly — only `ka-plan` or `ka-execute`, which apply their own hard-stops, risk tiers, and schema validation. Two orchestrators independently deciding when it's safe to touch the same worker skill is the exact failure mode this avoids.
+| Owner | Responsibility |
+|---|---|
+| `ka-intake` | requirement completeness (always-on rule, runs before this skill) |
+| `ka-plan` | design decisions → `.agents/memory/decisions.json` |
+| **`ka-workflow`** | state, gates, Execute stage (schema validation, risk tier, routing) |
+| `ka-be` / `ka-fe` / `ka-db-schema` / `ka-contract` / `ka-test` / `ka-ops` | implementation |
 
-See `assets/architecture-overview.mermaid` for the high-level relationship between all three skills, and `assets/lifecycle-state-machine.mermaid` for the full state/gate diagram referenced throughout this file.
+Diagrams: `assets/architecture-overview.mermaid`, `assets/lifecycle-state-machine.mermaid`.
 
-## 2. Decoupled State & Rule Engine Protocol
-1. **State Store**: `node .agents/scripts/state-manager.js get` (queries `.agents/memory/state.json`).
-2. **Rule Engine**: lifecycle stages and gate definitions live in `.agents/config/workflow.json`. This controls *when a gate exists*, not *whether execution is confirmed* — confirmation strength for anything touching code or infra always comes from `ka-plan`/`ka-execute`, never from `workflow.json` alone.
-3. **Session Turn Warning**: if `session_turn` > 15, warn the user of LLM drift risk.
-4. **Transition Log**: on every transition, print `🔔 TRANSITION: [OLD_STATE] -> [NEW_STATE]`. Every transition in this version passed through a `ka-plan` lock or a `ka-execute`/gate confirmation first — none happen silently.
+## 2. State store (enforced, not advisory)
 
-## 3. Delegation Protocol
+```bash
+node .agents/scripts/state-manager.js list                                  # all features
+node .agents/scripts/state-manager.js get    --feature <slug>
+node .agents/scripts/state-manager.js update --feature <slug> --proposal <KEY> [--approved-by-user "<reply>"]
+node .agents/scripts/state-manager.js test   --feature <slug> --phase red|green --cmd "<test command>"
+```
 
-0. **Intake** — every request arrives already filtered through `ka-intake` (triggered by the always-on rule in `AGENTS.md`, not by `ka-workflow` itself). By the time `ka-workflow` sees a request, missing-but-material business fields have already been asked about or explicitly flagged as assumptions. `ka-workflow` does not re-run this check — it trusts the completed requirement it receives.
-1. **Design stages** (new feature, re-design, ADR needed, `COMPLEX_MODE` route) → invoke `ka-plan`. Wait for a locked `decisions.json` entry, or an explicit decline, before proceeding.
-2. **Build/deploy stages** → invoke `ka-execute` with no preset action/options. Its own Step 0 finds the locked decision and takes it from there, including its risk-tier ladder and schema validation — `ka-workflow` does not pre-fill or bypass any of it.
-3. **Review stage** — present the walkthrough/diff directly (see `BE_REVIEW_GATE` below); this happens after `ka-execute` returns.
-4. Once a stage returns, read its proposed next state and, after any required gate is approved, update the store:
-   ```bash
-   node .agents/scripts/state-manager.js update --proposal [PROPOSED_KEY]
-   ```
+- **Always pass `--feature <slug>`** (kebab-case feature name). Omitting it uses the legacy single `state.json`.
+- Human gates refuse to move (exit 4) without `--approved-by-user` containing the user's **verbatim** reply. Never invent it.
+- `TEST_GATE` only accepts RED/GREEN runs executed by the script itself (exit 2/3 otherwise). Do not hand-write evidence.
+- Print `🔔 TRANSITION: [OLD] -> [NEW]` after each successful update. Full gate rules: `references/gates.md`.
+- Profile: `full` (`workflow.json`) for products touching money/auth/tenant data; `lite` (`workflow.lite.json`) for small repos — `IN_PROGRESS → TEST_GATE → COMPLETION_GATE`.
 
-## 4. Gates
-Full descriptions, including the `DEPLOYMENT_GATE` double-confirmation rationale and the `BLOCKER_RESOLUTION_GATE` retry cap, are in `references/gates.md`. Summary:
+## 3. Lifecycle (full profile)
 
-| Gate | Trigger | Confirmation |
+1. **Design** (`DESIGN_NEEDED`) → invoke `ka-plan`. It locks a decision and proposes `PLAN_PATCH | PLAN_STANDARD | PLAN_COMPLEX | PLAN_FAST_TRACK`. COMPLEX goes through `ADR_GATE`.
+2. **Execute** (`LOCKED_DECISION`) → run §4, then propose `EXECUTE_<ACTION>`.
+3. **Test** (`TEST_GATE`) → RED/GREEN via `state-manager.js test`, then `PASS`.
+4. **Review** (`REVIEW_GATE`) → present walkthrough; in `full` profile first run a `ka-review` pass on the diff.
+5. **More work / deploy / finish** (`BUILD_DONE`) → `NEXT_STEP`, `PROPOSE_DEPLOY`, or `SKIP_DEPLOY`.
+6. **Completion** (`COMPLETION_GATE`) → user confirms → `READY_TO_ARCHIVE`.
+
+## 4. Execute stage (formerly ka-execute)
+
+### Step 0 — Locked handoff
+Find the newest entry in `.agents/memory/decisions.json` with `status: "locked"`, no `consumed_at`, and matching `feature` (if set).
+- Found and locked **in this session** after the user picked the D3 trade-off → adopt it without re-asking.
+- Found from an earlier session → show summary + action + options + tier in one line and ask "Dùng luôn? (yes/no)". 🛑
+- Not found → Step 1.
+
+### Step 1 — Action & options (only without a handoff)
+Ask once for action (`backend | frontend | schema | contract | test | ops`) **and** options JSON in the same message. Invalid action or unparseable JSON → re-ask; cancel after 3 failed attempts.
+
+### Step 2 — Validate
+Validate options against `references/option-schemas.md`. Applies to handoff options too. On failure list missing/invalid fields and re-ask. 🛑
+
+### Step 3 — Risk tier (never skippable for tier ≥ 3)
+
+| Tier | Default for | Confirmation |
 |---|---|---|
-| `ADR_APPROVAL_ON_COMPLEX` | `route == COMPLEX_MODE` | 🛑 review + sign off on ADR |
-| `BE_REVIEW_GATE` | backend action completes | 🛑 approve code review walkthrough |
-| `BE_FE_GATE_ON_UI` | backend proposes `success_with_ui` | 🛑 approve before frontend work starts |
-| `DEPLOYMENT_GATE` | before an `ops` action | 🛑 workflow-level approve, then `ka-execute`'s own tier-4 confirm |
-| `COMPLETION_GATE` | before `READY_TO_ARCHIVE` | 🛑 confirm feature completion |
-| `BLOCKER_RESOLUTION_GATE` | retry limit exceeded | 🛑 manual resolution, max 3 resets per state |
+| 1 | frontend, test | none beyond the plan — proceed |
+| 2 | backend, contract | none if adopted from an in-session locked decision; otherwise `yes/no` |
+| 3 | schema; backend touching auth/payments/tenant isolation | user types the action name back 🛑 |
+| 4 | ops | user types the action name **and** confirms env + rollback plan 🛑 |
 
-## 5. Drift & Error Recovery
-1. **Self-Healing Loop**: on a verification failure from `ka-execute`, propose transition key `failure`; `state-manager.js` tracks retries per-state and moves to `BLOCKED` once the limit is exceeded (see `BLOCKER_RESOLUTION_GATE`). Halt, report the error, wait for manual resolution.
-2. **Drift Warning**: if an agent violates directories, skips planning, or writes outside approved specs, stop immediately and output the Drift Detected alert. Treat this like `BLOCKED` — do not resume without explicit user direction.
+**Fast-track / autonomous goals may auto-confirm tier 1–2 only.** Tier 3–4 always stop, whatever the mode. Custom actions must declare a tier — never default to 1.
 
-## 6. DSH Autonomous Native Protocol (Zero-Babysitting Mode)
-When running inside DeepSeek Harness (DSH):
-1. **Goal Engine Integration**: If a long-running feature is requested, initialize a persistent session goal via `create_goal` with `max_goal_rounds` (e.g. 20–30) to allow automatic continuation rounds across lifecycle gates.
-2. **Todo Synchronization**: Maintain live status in `todo_write`. Keep exactly 1 concrete task `in_progress` at any time; mark `completed` immediately upon verification pass.
-3. **Adversarial Gate Auditing via Subagents**: Before passing the review gate, fork an independent subagent with `ka-review` to ruthlessly audit domain purity, single-screen compliance (≤50 lines), and ghost code.
-4. **Fast-Track Auto Advance**: In Fast-Track Mode (templates provided), internal sub-gates advance automatically if all automated verification checks (Unit + Integration + Visual Screenshot + Typecheck) succeed without errors.
+### Step 4 — Route
+Load the worker skill through the host's skill mechanism (skill tool, `/skill-name`, or reading `../<worker>/SKILL.md`) and pass the validated options:
+
+| Action | Worker | Next proposal |
+|---|---|---|
+| backend | `ka-be` | `EXECUTE_BE` |
+| frontend | `ka-fe` | `EXECUTE_FE` |
+| schema | `ka-db-schema` | `EXECUTE_SCHEMA` |
+| contract | `ka-contract` | `EXECUTE_CONTRACT` |
+| test | `ka-test` | `EXECUTE_TEST` |
+| ops | `ka-ops` | `EXECUTE_OPS` (→ `DEPLOYMENT_GATE` before anything runs) |
+
+Prefix worker errors with `⚠️`. After use, write `consumed_at` into the decision entry.
+
+## 5. Interaction budget
+
+Every 🛑 costs the user a turn. Target stops per feature, intake included:
+
+| Scale | Target | Where |
+|---|:-:|---|
+| PATCH / lite | 1–2 | intake (only if material gap) · review+completion batched |
+| STANDARD | 3–5 | intake ≤1 · plan D1+D2 · plan D3 · review · completion |
+| COMPLEX | 6–8 | + separate D1/D2 · ADR · deploy |
+
+Batch adjacent human gates per `references/gates.md` → "Batching human gates". Exceeding the target by 2+ stops is a smell: say so and offer to batch the rest.
+
+## 6. Drift & recovery
+
+1. Worker verification fails → propose `FAILURE`; 3 failures → `BLOCKED`. Stop and report; resume only with user approval (`--reset-retries`, max 3).
+2. Agent writes outside approved scope, skips planning, or fabricates an approval → output **Drift Detected**, treat as `BLOCKED`.
+3. Long sessions (> ~15 turns on one feature) → offer a `ka-handoff` snapshot before continuing.
+
+## 7. Autonomous mode (DSH goal engine, or any long-running agent loop)
+
+- Persist a goal if the host supports it (e.g. DSH `create_goal`, `max_goal_rounds` 20–30); keep exactly one todo `in_progress`.
+- Automated gates (`TEST_GATE`) advance on their own once script-run RED/GREEN exist.
+- Human gates **do not** auto-advance: collect them and present one batched decision message when the build is ready. `ADR_GATE`, `DEPLOYMENT_GATE`, `BLOCKED` and tier 3–4 actions are never batched or skipped.
 
 ## References
-- `references/gates.md` — full gate descriptions, including retry caps and the deploy double-confirmation rationale.
-- `assets/architecture-overview.mermaid` — how `ka-workflow`, `ka-plan`, and `ka-execute` relate.
-- `assets/lifecycle-state-machine.mermaid` — full state/gate diagram for the design → build → review → deploy → archive lifecycle.
-- `ka-plan`, `ka-execute` — the two skills this orchestrator delegates to.
+- `references/gates.md` — gate rules, batching, transition keys, profiles.
+- `references/option-schemas.md` — per-action option schema (Step 2).
+- `references/eval-cases.md` — routing and behavior evals.
+- `assets/lifecycle-state-machine.mermaid`, `assets/architecture-overview.mermaid`.

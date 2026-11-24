@@ -1,36 +1,37 @@
 flowchart TD
-    User(["User request"]) --> CLAUDEMD{{"AGENTS.md<br/>always-on Intake Rule"}}
-    CLAUDEMD --> INTAKE["ka-intake<br/>(completeness checklist)"]
-    INTAKE -->|"missing material info"| AskUser{{"🛑 batched<br/>clarifying questions<br/>(max 2 rounds)"}}
+    User(["User request"]) --> RULE{{"AGENTS.md<br/>always-on rules"}}
+    RULE --> INTAKE["ka-intake<br/>(completeness check)"]
+    INTAKE -->|"material gap"| AskUser{{"🛑 batched questions<br/>(max 2 rounds)"}}
     AskUser --> INTAKE
-    INTAKE -->|"requirement complete"| WF["ka-workflow<br/>(lifecycle orchestrator)"]
+    INTAKE -->|"complete"| WF["ka-workflow<br/>(lifecycle + Execute stage)"]
 
-    WF -->|"design/re-design<br/>needed"| PLAN["ka-plan<br/>(Socratic design, D1-D5)"]
-    PLAN -->|"locks"| DECISIONS[("decisions.json<br/>execution_hint")]
+    WF -->|"design needed"| PLAN["ka-plan<br/>(Explore / Q / D / A)"]
+    PLAN -->|"locks"| DECISIONS[("decisions.json<br/>execution_hint + test_plan")]
+    DECISIONS -.->|"Execute Step 0"| WF
 
-    WF -->|"build/deploy<br/>stage reached"| EXEC["ka-execute<br/>(risk-tier router)"]
-    DECISIONS -.->|"Step 0: read handoff"| EXEC
+    WF -->|"backend"| BE["ka-be"]
+    WF -->|"frontend"| FE["ka-fe"]
+    WF -->|"schema"| DB["ka-db-schema"]
+    WF -->|"contract"| CT["ka-contract"]
+    WF -->|"test"| TEST["ka-test"]
+    WF -->|"ops"| OPS["ka-ops"]
 
-    EXEC -->|"action=backend"| BE["ka-be"]
-    EXEC -->|"action=frontend"| FE["ka-fe"]
-    EXEC -->|"action=schema"| DB["ka-db-schema"]
-    EXEC -->|"action=test"| TEST["ka-test"]
-    EXEC -->|"action=ops"| OPS["ka-ops"]
+    BE --> SM
+    FE --> SM
+    DB --> SM
+    CT --> SM
+    TEST --> SM
+    OPS --> SM
+    SM[["state-manager.js<br/>TEST_GATE: script-run RED/GREEN<br/>human gates: --approved-by-user"]] --> WF
 
-    BE --> WF
-    FE --> WF
-    DB --> WF
-    TEST --> WF
-    OPS --> WF
-
-    WF -->|"gates:<br/>ADR / review / deploy / completion"| Approve{{"🛑 user<br/>confirms"}}
+    WF -->|"review / deploy / completion"| Approve{{"🛑 user decides<br/>(batched when adjacent)"}}
     Approve --> WF
 
-    style CLAUDEMD fill:#4a5568,color:#fff
+    style RULE fill:#4a5568,color:#fff
     style INTAKE fill:#805ad5,color:#fff
     style WF fill:#2d3748,color:#fff
     style PLAN fill:#2b6cb0,color:#fff
-    style EXEC fill:#2f855a,color:#fff
     style DECISIONS fill:#744210,color:#fff
+    style SM fill:#2f855a,color:#fff
     style Approve fill:#c53030,color:#fff
     style AskUser fill:#c53030,color:#fff

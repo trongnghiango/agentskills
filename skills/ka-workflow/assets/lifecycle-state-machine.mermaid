@@ -1,56 +1,59 @@
 stateDiagram-v2
     [*] --> DESIGN_NEEDED
 
-    DESIGN_NEEDED --> ka_plan: ka-workflow invokes ka-plan
-    ka_plan --> ADR_GATE: route == COMPLEX_MODE
-    ka_plan --> LOCKED_DECISION: route != COMPLEX_MODE
+    DESIGN_NEEDED --> ADR_GATE: ka-plan locks, route == COMPLEX_MODE
+    DESIGN_NEEDED --> LOCKED_DECISION: ka-plan locks (PATCH / STANDARD / FAST_TRACK)
 
-    ADR_GATE --> LOCKED_DECISION: 🛑 user approves ADR
-    ADR_GATE --> DESIGN_NEEDED: user rejects, back to ka-plan
+    ADR_GATE --> LOCKED_DECISION: 🛑 human APPROVE
+    ADR_GATE --> DESIGN_NEEDED: REJECT
 
-    LOCKED_DECISION --> ka_execute: ka-workflow invokes ka-execute\n(no preset action - reads decisions.json itself)
-
-    state ka_execute {
+    state Execute {
         [*] --> ReadHandoff
         ReadHandoff --> ValidateSchema
-        ValidateSchema --> RiskTierConfirm: 🛑 tier 1-4 confirmation
+        ValidateSchema --> RiskTierConfirm: tier 3-4 always 🛑
         RiskTierConfirm --> RouteToWorker
         RouteToWorker --> [*]
     }
 
-    ka_execute --> BE_REVIEW_GATE: action == backend
-    ka_execute --> DEPLOY_RESULT: action == ops
-    ka_execute --> BUILD_DONE: action in [frontend, schema, test]
+    LOCKED_DECISION --> Execute: ka-workflow Execute stage
+    Execute --> TEST_GATE: EXECUTE_BE / FE / SCHEMA / CONTRACT / TEST
+    Execute --> DEPLOYMENT_GATE: EXECUTE_OPS
 
-    BE_REVIEW_GATE --> BE_FE_GATE_ON_UI: 🛑 user approves walkthrough\n(needs UI)
-    BE_REVIEW_GATE --> BUILD_DONE: 🛑 user approves walkthrough\n(no UI needed)
+    TEST_GATE --> REVIEW_GATE: PASS (script-run RED + GREEN)
+    TEST_GATE --> BLOCKED: FAIL
 
-    BE_FE_GATE_ON_UI --> ka_execute: 🛑 approved, ka-execute runs frontend action
+    REVIEW_GATE --> BUILD_DONE: 🛑 APPROVE / SUCCESS_NO_UI
+    REVIEW_GATE --> BE_FE_GATE_ON_UI: 🛑 SUCCESS_WITH_UI
+    REVIEW_GATE --> LOCKED_DECISION: 🛑 REQUEST_CHANGES
 
-    state DEPLOYMENT_GATE_choice <<choice>>
-    BUILD_DONE --> DEPLOYMENT_GATE_choice
-    DEPLOYMENT_GATE_choice --> DEPLOYMENT_GATE: ops action needed
+    BE_FE_GATE_ON_UI --> LOCKED_DECISION: 🛑 APPROVE (then EXECUTE_FE)
+    BE_FE_GATE_ON_UI --> BUILD_DONE: SKIP_UI
 
-    DEPLOYMENT_GATE --> ka_execute: 🛑 workflow-level approve\n(then ka-execute tier-4 confirm again)
-    ka_execute --> DEPLOY_RESULT
+    BUILD_DONE --> LOCKED_DECISION: NEXT_STEP
+    BUILD_DONE --> DEPLOYMENT_GATE: PROPOSE_DEPLOY
+    BUILD_DONE --> COMPLETION_GATE: SKIP_DEPLOY
 
-    DEPLOY_RESULT --> COMPLETION_GATE: success
-    DEPLOY_RESULT --> BLOCKED: failure, retries exceeded
+    DEPLOYMENT_GATE --> DEPLOY_RESULT: 🛑 APPROVE
+    DEPLOYMENT_GATE --> BUILD_DONE: REJECT
+    DEPLOY_RESULT --> COMPLETION_GATE: SUCCESS
+    DEPLOY_RESULT --> BLOCKED: FAILURE
 
-    COMPLETION_GATE --> READY_TO_ARCHIVE: 🛑 user confirms completion
+    COMPLETION_GATE --> READY_TO_ARCHIVE: 🛑 APPROVE
+    COMPLETION_GATE --> LOCKED_DECISION: REQUEST_CHANGES
 
-    BLOCKED --> ka_execute: user runs --reset-retries\n(max 3x per state)
-    BLOCKED --> DESIGN_NEEDED: 4th failure -\nreturn to ka-plan instead of retrying
+    BLOCKED --> LOCKED_DECISION: 🛑 RESUME_PATCH (max 3 resets)
+    BLOCKED --> TEST_GATE: 🛑 RESUME_TEST
+    BLOCKED --> REVIEW_GATE: 🛑 RESUME_REVIEW
+    BLOCKED --> DESIGN_NEEDED: ROLLBACK_TO_DESIGN / 4th reset
 
     READY_TO_ARCHIVE --> [*]
 
-    note right of ka_execute
-        ka-execute owns all risk-tier
-        confirmation + schema validation.
-        ka-workflow never bypasses this.
+    note right of TEST_GATE
+        Only runs executed by
+        state-manager.js test count.
     end note
 
     note right of BLOCKED
-        Reset cap prevents infinite
-        retry loops (added in 5.0.0).
+        🛑 = needs --approved-by-user,
+        logged to approvals.log
     end note
