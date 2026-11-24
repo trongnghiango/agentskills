@@ -24,7 +24,7 @@
         "EXECUTE_FE": "BUILD_DONE",
         "EXECUTE_SCHEMA": "BUILD_DONE",
         "EXECUTE_CONTRACT": "BUILD_DONE",
-        "EXECUTE_TEST": "BUILD_DONE"
+        "EXECUTE_TEST": "TEST_GATE"
       }
     },
     "BE_REVIEW_GATE": {
@@ -71,9 +71,26 @@
         "RESUME_BE": "BE_REVIEW_GATE",
         "RESUME_PATCH": "LOCKED_DECISION",
         "RESUME_FE": "BUILD_DONE",
-        "ROLLBACK_TO_DESIGN": "DESIGN_NEEDED"
+        "ROLLBACK_TO_DESIGN": "DESIGN_NEEDED",
+        "RESUME_TEST": "TEST_GATE"
       }
     },
-    "READY_TO_ARCHIVE": {}
+    "READY_TO_ARCHIVE": {},
+    "TEST_GATE": {
+      "gate": "TEST_EVIDENCE_GATE",
+      "transitions": {
+        "PASS": "BUILD_DONE",
+        "FAIL": "BLOCKED"
+      },
+      "requires": [
+        "command",
+        "red_output",
+        "green_output",
+        "cases"
+      ],
+      "requires_for": [
+        "PASS"
+      ]
+    }
   }
 }

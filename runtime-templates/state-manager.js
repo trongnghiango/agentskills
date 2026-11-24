@@ -82,7 +82,7 @@ if (!command || (command !== 'get' && command !== 'update')) {
   console.log(`
 Usage:
   node state-manager.js get
-  node state-manager.js update --proposal <PROPOSAL_KEY> [--route <ROUTE>] [--completed-file <PATH>] [--reset-retries]
+  node state-manager.js update --proposal <PROPOSAL_KEY> [--route <ROUTE>] [--completed-file <PATH>] [--evidence <PATH>] [--reset-retries] [--dry-run]
 `);
   process.exit(1);
 }
@@ -99,6 +99,8 @@ let proposal = null;
 let route = null;
 let completedFile = null;
 let resetRetries = false;
+let evidencePath = null;
+let dryRun = false;
 
 for (let i = 1; i < args.length; i++) {
   if (args[i] === '--proposal') {
@@ -110,6 +112,11 @@ for (let i = 1; i < args.length; i++) {
   } else if (args[i] === '--completed-file') {
     completedFile = args[i + 1];
     i++;
+  } else if (args[i] === '--evidence') {
+    evidencePath = args[i + 1];
+    i++;
+  } else if (args[i] === '--dry-run') {
+    dryRun = true;
   } else if (args[i] === '--reset-retries') {
     resetRetries = true;
   }
@@ -204,6 +211,24 @@ if (currentStateName === 'BLOCKED' && resetRetries) {
   console.log(`🔄 Resetting retries for state '${state.last_blocked_state}' (Reset ${resetCount + 1}/3)`);
 }
 
+// Gate evidence enforcement: a state that declares `requires` blocks PASS/APPROVE
+// until the evidence file proves each required field.
+const requiredFields = currentStateConfig.requires || [];
+const requiredFor = (currentStateConfig.requires_for || ['PASS', 'APPROVE']).map((k) => k.toUpperCase());
+if (requiredFields.length > 0 && requiredFor.includes(matchedProposalKey.toUpperCase())) {
+  const evidence = validateEvidenceGate(requiredFields, evidencePath, currentStateConfig.gate || currentStateName);
+  if (dryRun) {
+    console.log(`🧪 Dry run: gate '${currentStateConfig.gate || currentStateName}' would PASS with evidence ${evidencePath}`);
+    process.exit(0);
+  }
+  state.last_evidence = evidence;
+}
+
+if (dryRun) {
+  console.log(`🧪 Dry run: [${state.current_state}] -> [${nextState}] via '${matchedProposalKey}' (no write)`);
+  process.exit(0);
+}
+
 // Make transition
 const oldState = state.current_state;
 state.current_state = nextState;
@@ -249,4 +274,37 @@ function handleFailure(state, failedState) {
   }
   
   saveState(state);
+}
+
+function validateEvidenceGate(requiredFields, evidencePath, gateName) {
+  if (!evidencePath) {
+    console.error(`❌ Gate '${gateName}' requires evidence.`);
+    console.error(`   Re-run with: --evidence <file.json>`);
+    console.error(`   Required fields: ${requiredFields.join(', ')}`);
+    process.exit(2);
+  }
+  if (!fs.existsSync(evidencePath)) {
+    console.error(`❌ Evidence file not found: ${evidencePath}`);
+    process.exit(2);
+  }
+  let evidence;
+  try {
+    evidence = JSON.parse(fs.readFileSync(evidencePath, 'utf8'));
+  } catch (err) {
+    console.error(`❌ Evidence file is not valid JSON: ${err.message}`);
+    process.exit(2);
+  }
+  const missing = requiredFields.filter((field) => {
+    const value = evidence[field];
+    if (Array.isArray(value)) return value.length === 0;
+    return typeof value !== 'string' || value.trim().length === 0;
+  });
+  if (missing.length > 0) {
+    console.error(`❌ Evidence missing or empty: ${missing.join(', ')}`);
+    process.exit(2);
+  }
+  const crypto = require('crypto');
+  const sha256 = crypto.createHash('sha256').update(fs.readFileSync(evidencePath)).digest('hex').slice(0, 12);
+  console.log(`✅ Gate '${gateName}' evidence accepted (${path.basename(evidencePath)} sha256:${sha256})`);
+  return { file: evidencePath, sha256, gate: gateName, accepted_at: new Date().toISOString() };
 }

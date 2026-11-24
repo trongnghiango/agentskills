@@ -5,6 +5,7 @@ For each gate, `ka-workflow` is responsible for *presenting* it; the underlying 
 * **`ADR_APPROVAL_ON_COMPLEX`**: if `route === 'COMPLEX_MODE'`, halt and 🛑 ask the user to review and sign off on the ADR/technical design document produced by `ka-plan`.
 * **`BE_REVIEW_GATE`**: after `ka-execute` completes a backend action, 🛑 present the Code Review Walkthrough. Verify it contains a **Security & Isolation Code Diff** section before letting the user approve the transition to verify.
 * **`BE_FE_GATE_ON_UI`**: if the backend walkthrough proposes transition key `success_with_ui` toward `FE_PLANNING`, 🛑 confirm the walkthrough's Security & Isolation section exists before asking for approval.
+* **`TEST_EVIDENCE_GATE`**: sau khi `ka-test`/developer hoàn tất thay đổi, 🛑 yêu cầu evidence trước khi cho sang `BUILD_DONE`: (1) lệnh test đã chạy, (2) output RED trước khi sửa (dán nguyên văn dòng fail), (3) output GREEN sau khi sửa, (4) danh sách case + coverage delta. Feature mới hoặc bug fix thiếu mục (2) → FAIL, quay về `BLOCKED` với `RESUME_TEST`. Xem `skills/ka-test/references/tdd-loop.md`. **Enforced**: `state-manager.js` đọc `requires` của state trong `workflow.json` và từ chối `PASS` nếu thiếu `--evidence`; thiếu field → exit 2.
 * **`DEPLOYMENT_GATE`**: before invoking `ka-execute` for an `ops` action, 🛑 present the ops plan: *"Infrastructure package ready. Deploy to staging?"* This is in addition to, not instead of, `ka-execute`'s own tier-4 confirmation (type-to-confirm + rollback acknowledgement). The user confirms twice for deploys — once at the workflow level, once at the execute level. This redundancy is intentional for the highest-risk action in the system.
 * **`COMPLETION_GATE`**: before transitioning to `READY_TO_ARCHIVE`, 🛑 display the E2E walkthrough and ask: *"Confirm feature completion and archive?"*
 * **`BLOCKER_RESOLUTION_GATE`**: when state transitions to `BLOCKED` (retry limit exceeded or deploy failure), freeze execution, display the blockers, and wait for:
@@ -22,6 +23,7 @@ All `next_state_proposal` keys used by worker skills and consumed by `ka-workflo
 | `success` | ka-plan, ka-contract, ka-db-schema, ka-fe, ka-review, ka-ops | Stage completed successfully. |
 | `success_with_ui` | ka-be | Backend completed; frontend work is required next. Routes through `BE_FE_GATE_ON_UI`. |
 | `success_no_ui` | ka-be | Backend completed; no frontend work needed. Skips `FE_PLANNING`. |
+| `test_pass` | ka-test | Evidence hợp lệ; gate chuyển `BUILD_DONE`. |
 | `failure` | ka-be, ka-fe, ka-ops, ka-review | Stage failed verification. Triggers retry logic; may escalate to `BLOCKER_RESOLUTION_GATE` after retry limit. |
 
 When adding a new worker skill, register its transition keys in this table and in `workflow.json` state definitions.
