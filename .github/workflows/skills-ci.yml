@@ -1,0 +1,27 @@
+name: skills-ci
+on:
+  push:
+  pull_request:
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install pyyaml
+      - run: python3 scripts/lint-skills.py
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - run: for f in runtime-templates/*.js; do node --check "$f"; done
+      - name: skill routing evals (static)
+        run: node scripts/run-evals.mjs
+      - name: state-manager gate test
+        run: bash scripts/test-state-manager.sh
+      - name: secret scan
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

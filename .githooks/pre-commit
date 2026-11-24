@@ -1,0 +1,22 @@
+#!/usr/bin/env bash
+# ka-team pre-commit: skill lint + secret scan + JS syntax.
+set -u
+fail=0
+cd "$(git rev-parse --show-toplevel 2>/dev/null || echo .)"
+
+if command -v python3 >/dev/null; then
+  python3 scripts/lint-skills.py || fail=1
+fi
+
+if command -v gitleaks >/dev/null; then
+  gitleaks protect --staged --no-banner -v || { echo "gitleaks: secret detected"; fail=1; }
+else
+  echo "note: gitleaks not installed, skipping secret scan"
+fi
+
+for f in runtime-templates/*.js; do
+  [ -e "$f" ] || continue
+  if command -v node >/dev/null; then node --check "$f" || fail=1; fi
+done
+
+exit $fail

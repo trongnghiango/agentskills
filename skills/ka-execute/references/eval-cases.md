@@ -1,6 +1,6 @@
 # Eval Cases
 
-Run these through `claude-with-access-to-the-skill` (or the internal skill-creator harness) to verify behavior after any change to `SKILL.md` or `option-schemas.md`.
+Run these with `node scripts/run-evals.mjs --mode llm` (or any harness with the skill loaded) to verify behavior after any change to `SKILL.md` or `option-schemas.md`.
 
 ```json
 [
