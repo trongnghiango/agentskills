@@ -1,13 +1,12 @@
 #!/usr/bin/env node
 /**
- * run-evals.mjs — chạy eval cho bộ skill ka-*.
+ * run-evals.mjs — kiểm tra cấu trúc và độ phân tách định tuyến (routing) cho bộ skill ka-*.
  *
- * static (mặc định, không cần mạng):
- *   - parse eval-cases.md (fenced JSON array hoặc bảng markdown)
- *   - kiểm tra prompt rỗng, prompt gọi sai skill, prompt trùng, coverage
- *
- * llm: gọi endpoint OpenAI-compatible để test routing thật.
- *   EVAL_BASE_URL=https://.../v1 EVAL_MODEL=... EVAL_API_KEY=... node scripts/run-evals.mjs --mode llm
+ * Modes:
+ *   static (mặc định, offline): kiểm tra cú pháp eval-cases.md, độ phủ, trùng lặp, slash-command lệch.
+ *   heuristic (offline): chấm điểm khớp từ khoá + anti-trigger giữa prompt và description để đo độ chồng chéo catalog.
+ *   llm: gọi endpoint OpenAI-compatible để đo routing thật trên model.
+ *        EVAL_BASE_URL=https://.../v1 EVAL_MODEL=... EVAL_API_KEY=... node scripts/run-evals.mjs --mode llm
  */
 import { readFileSync, readdirSync, existsSync } from 'node:fs'
 import { join, dirname } from 'node:path'
@@ -36,35 +35,43 @@ function parseCases(text) {
     try {
       const arr = JSON.parse(block[1])
       if (Array.isArray(arr)) for (const c of arr) cases.push(normalize(c))
-    } catch { /* not a JSON case block */ }
+    } catch { /* ignore non-case JSON */ }
   }
   for (const line of text.split('\n')) {
     if (!line.trim().startsWith('|')) continue
     const cells = line.split('|').slice(1, -1).map((c) => c.trim())
-    if (cells.length < 3) continue
-    if (/^#?$/.test(cells[0]) || /^-+$/.test(cells[0])) continue
+    if (cells.length < 3 || /^#?$/.test(cells[0]) || /^-+$/.test(cells[0])) continue
     const toggle = cells.find((c) => c === 'true' || c === 'false')
     if (!toggle) continue
     const promptCell = cells.find((c) => /["'`]/.test(c) && c !== toggle && !/^-+$/.test(c))
     if (!promptCell) continue
-    cases.push(normalize({ id: cells[0], prompt: promptCell.replace(/^["'`]|["'`]$/g, ''), should_trigger: toggle === 'true', description: cells[cells.length - 1] }))
+    cases.push(normalize({
+      id: cells[0],
+      prompt: promptCell.replace(/^["'`]|["'`]$/g, ''),
+      should_trigger: toggle === 'true',
+      description: cells[cells.length - 1],
+    }))
   }
   return cases
 }
 
 function normalize(c) {
-  const should = c.should_trigger ?? c.shouldTrigger ?? true
+  const hasKey = 'should_trigger' in c || 'shouldTrigger' in c
+  const raw = c.should_trigger ?? c.shouldTrigger
+  const isScenario = String(c.prompt ?? '').trim().startsWith('(')
+  const should = isScenario ? null : (hasKey ? (raw === null ? null : Boolean(raw)) : true)
   return {
     id: String(c.id ?? ''),
     prompt: String(c.prompt ?? '').trim(),
-    should_trigger: should === null || should === undefined ? null : Boolean(should),
-    description: String(c.description ?? c.expected_behavior ?? '').trim(),
+    scenario: isScenario,
+    should_trigger: should,
+    description: String(c.description ?? c.expected_behavior ?? c.reason ?? '').trim(),
   }
 }
 
 function loadSkills() {
   const skills = []
-  for (const dir of readdirSync(SKILLS, { withFileTypes: true })) {
+  for (const dir of readdirSync(SKILLS, { withFileTypes: true }).sort((a, b) => a.name.localeCompare(b.name))) {
     if (!dir.isDirectory()) continue
     const file = join(SKILLS, dir.name, 'SKILL.md')
     if (!existsSync(file)) continue
@@ -78,25 +85,90 @@ function loadSkills() {
 
 function staticMode(skills) {
   const errors = [], warns = []
-  const seen = new Map()
+  const seenPositive = new Map()
   for (const skill of skills) {
     if (skill.cases.length < MIN_CASES) warns.push(`${skill.name}: chỉ có ${skill.cases.length} eval case (khuyến nghị ≥ ${MIN_CASES})`)
+    const triggerCases = skill.cases.filter((c) => !c.scenario)
+    if (triggerCases.length === 0) warns.push(`${skill.name}: chưa có trigger eval case thực tế`)
     for (const c of skill.cases) {
       if (c.prompt.length < 6) errors.push(`${skill.name}#${c.id}: prompt rỗng/ngắn`)
-      if (c.should_trigger === null) warns.push(`${skill.name}#${c.id}: thiếu should_trigger`)
+      if (!c.scenario && c.should_trigger === null) warns.push(`${skill.name}#${c.id}: thiếu should_trigger`)
       const explicit = (c.prompt.match(/^\/([a-z0-9-]+)/) || [])[1]
-      if (explicit && explicit !== skill.name) warns.push(`${skill.name}#${c.id}: prompt gọi /${explicit} (routed) — kiểm tra đúng router`)
-      const key = c.prompt.toLowerCase()
-      if (seen.has(key)) warns.push(`${skill.name}#${c.id}: prompt trùng với ${seen.get(key)} (khác kỳ vọng thì OK)`)
-      else seen.set(key, `${skill.name}#${c.id}`)
+      if (explicit && explicit !== skill.name && c.should_trigger === true) {
+        warns.push(`${skill.name}#${c.id}: prompt gọi /${explicit} nhưng kỳ vọng ${skill.name}`)
+      }
+      if (!c.scenario && c.should_trigger === true) {
+        const key = c.prompt.toLowerCase()
+        if (seenPositive.has(key)) errors.push(`${skill.name}#${c.id}: trùng positive prompt với ${seenPositive.get(key)}`)
+        else seenPositive.set(key, `${skill.name}#${c.id}`)
+      }
     }
   }
   const total = skills.reduce((n, s) => n + s.cases.length, 0)
-  console.log(`skills: ${skills.length} | eval cases: ${total}`)
+  const catalogChars = skills.reduce((n, s) => n + s.name.length + s.desc.length + 4, 0)
+  console.log(`skills: ${skills.length} | eval cases: ${total} | catalog: ~${Math.round(catalogChars / 4)} tokens (${catalogChars} chars)`)
   for (const w of warns) console.log(`warn: ${w}`)
   for (const e of errors) console.error(`ERROR: ${e}`)
   console.log(`static: ${errors.length} error, ${warns.length} warn`)
   return errors.length ? 1 : 0
+}
+
+function tokenize(str) {
+  return str
+    .toLowerCase()
+    .replace(/do not use[^.]*\.?/gi, ' ')
+    .replace(/[^a-z0-9àáạảãâầấậẩẫăằắặẳẵèéẹẻẽêềếệểễìíịỉĩòóọỏõôồốộổỗơờớợởỡùúụủũưừứựửữỳýỵỷỹđ-]+/gi, ' ')
+    .split(/\s+/)
+    .filter((w) => w.length >= 2)
+}
+
+function heuristicMode(skills) {
+  const stop = new Set(['khi', 'cần', 'cho', 'các', 'một', 'với', 'hoặc', 'hay', 'trong', 'của', 'trước', 'sau', 'the', 'and', 'for', 'with', 'when', 'use', 'from'])
+  const profiles = skills.map((s) => {
+    const posPart = s.desc.split(/do not use/i)[0] || s.desc
+    const negPart = s.desc.split(/do not use/i)[1] || ''
+    const aliasOnly = /^alias \(deprecated/i.test(s.desc)
+    return {
+      name: s.name,
+      aliasOnly,
+      pos: new Set(tokenize(posPart).filter((t) => !stop.has(t))),
+      neg: new Set(tokenize(negPart).filter((t) => !stop.has(t) && !t.startsWith('ka-'))),
+    }
+  })
+
+  let ok = 0, total = 0
+  for (const s of skills) {
+    for (const c of s.cases) {
+      if (c.scenario || c.should_trigger === null) continue
+      total++
+      const explicit = (c.prompt.match(/^\/([a-z0-9-]+)/) || [])[1]
+      let best = 'NONE', bestScore = 0
+      if (explicit) {
+        best = explicit
+        bestScore = 10
+      } else {
+        const pTokens = tokenize(c.prompt).filter((t) => !stop.has(t))
+        for (const prof of profiles) {
+          if (prof.aliasOnly) continue
+          let score = 0
+          for (const t of pTokens) {
+            if (prof.pos.has(t)) score += 2
+            if (prof.neg.has(t)) score -= 1.5
+          }
+          if (score > bestScore) { bestScore = score; best = prof.name }
+        }
+        if (bestScore < 2) best = 'NONE'
+      }
+      const pass = c.should_trigger ? best === s.name : best !== s.name
+      if (pass) ok++
+      if (verbose || !pass) {
+        console.log(`${pass ? 'PASS' : 'MISS'} ${s.name}#${c.id} (should=${c.should_trigger}) -> picked=${best} (score=${bestScore}) :: "${c.prompt}"`)
+      }
+    }
+  }
+  const pct = total ? ((ok / total) * 100).toFixed(1) : '0.0'
+  console.log(`heuristic lexical baseline: ${ok}/${total} (${pct}%) — dùng --mode llm để đo semantic routing thật`)
+  return 0
 }
 
 async function llmMode(skills) {
@@ -107,20 +179,19 @@ async function llmMode(skills) {
     console.error('llm mode cần EVAL_BASE_URL, EVAL_MODEL (và EVAL_API_KEY nếu cần)')
     return 2
   }
-  const catalog = skills.filter((s) => s.cases.length).map((s) => `- ${s.name}: ${s.desc}`).join('\n')
-  let all = skills.filter((s) => s.cases.length).flatMap((s) => s.cases.map((c) => ({ owner: s.name, ...c })))
+  const catalog = skills.map((s) => `- ${s.name}: ${s.desc}`).join('\n')
+  let all = skills.flatMap((s) => s.cases.filter((c) => !c.scenario && c.should_trigger !== null).map((c) => ({ owner: s.name, ...c })))
   if (limit > 0) all = all.slice(0, limit)
 
-  let ok = 0; let total = 0
+  let ok = 0, total = 0
   for (const c of all) {
     total++
-    const expected = c.should_trigger === false ? 'NONE' : c.owner
     const body = {
       model,
       temperature: 0,
-      max_tokens: 12,
+      max_tokens: 16,
       messages: [
-        { role: 'system', content: `Bạn là router chọn skill cho coding agent. Danh sách skill:\n${catalog}\nTrả lời DUY NHẤT tên skill phù hợp, hoặc NONE nếu không skill nào phù hợp.` },
+        { role: 'system', content: `Bạn là router chọn skill phù hợp nhất cho yêu cầu của developer. Danh sách skill:\n${catalog}\nTrả lời DUY NHẤT tên 1 skill phù hợp nhất, hoặc NONE nếu không cần skill nào.` },
         { role: 'user', content: c.prompt },
       ],
     }
@@ -136,9 +207,10 @@ async function llmMode(skills) {
     } catch (err) {
       answer = `ERROR:${err.message}`
     }
-    const pass = answer.toLowerCase() === expected.toLowerCase()
+    const picked = answer.toLowerCase()
+    const pass = c.should_trigger ? picked === c.owner.toLowerCase() : picked !== c.owner.toLowerCase()
     if (pass) ok++
-    if (verbose || !pass) console.log(`${pass ? 'PASS' : 'FAIL'} ${c.owner}#${c.id} expected=${expected} got=${answer}`)
+    if (verbose || !pass) console.log(`${pass ? 'PASS' : 'FAIL'} ${c.owner}#${c.id} should=${c.should_trigger} got=${answer}`)
   }
   const acc = total ? ok / total : 0
   console.log(`llm: ${ok}/${total} (${(acc * 100).toFixed(1)}%)`)
@@ -146,4 +218,6 @@ async function llmMode(skills) {
 }
 
 const skills = loadSkills()
-process.exit(mode === 'llm' ? await llmMode(skills) : staticMode(skills))
+if (mode === 'llm') process.exit(await llmMode(skills))
+if (mode === 'heuristic') process.exit(heuristicMode(skills))
+process.exit(staticMode(skills))

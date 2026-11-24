@@ -1,32 +1,23 @@
-<!-- Append this block to the project's AGENTS.md (or repo-root AGENTS.md).
-     This is the ONLY part of the intake mechanism that is truly always-on —
-     it loads unconditionally every session, unlike Skills which load on match. -->
+<!-- Append this block to the project's AGENTS.md.
+     This loads unconditionally every session, unlike Skills which load on match. -->
 
+<!-- ka:intake-rule:start -->
 ## Intake Rule (always active)
 
-Before implementing **any** request — even one that sounds obvious — check whether the information provided is sufficient to form a complete business requirement, using the checklist in `ka-intake` (`.agents/skills/ka-intake/references/completeness-checklist.md`).
-
-Hard Rules:
-- If a business-level field is missing and **could affect the outcome**, ask first. Do not infer or pick "sensible defaults" on behalf of the user.
-- This is distinct from harmless technical assumptions (variable naming, code format) — those do not require asking.
-- Do not skip the check just because the request "sounds simple." "Sounds simple" is not evidence — use the checklist to confirm, not intuition.
-- Batch clarifying questions into a single message; do not ask one at a time in a way that drags the conversation (see limits in `ka-intake/SKILL.md`).
-
-If the request already includes a locked decision (`decisions.json` with `status: "locked"`), treat intake as complete — do not ask again.
+Before implementing **any** non-trivial request, verify requirement completeness using `ka-intake` (`.agents/skills/ka-intake/references/completeness-checklist.md`):
+- Skip immediately for pure cosmetic/typo fixes, read-only questions, or when an unconsumed locked `decisions.json` entry already covers the feature.
+- If a business-level field is missing and **material** (could change behavior, scope, permissions, money, or data integrity), ask **all** questions in **one batched message** (cap at 1 round for small fixes, 2 rounds max). Never silently invent business rules.
+- Casual urgency words (*"làm ngay"*, *"nhanh lên"*) never waive clarifying destructive, auth, billing, or production-ops ambiguities, and never waive Tier 3–4 confirmations in `ka-workflow`.
+<!-- ka:intake-rule:end -->
 
 ## Git Guardian Rule (always active)
 
-Before performing **any** git operation — including `git status`, `git add`, `git commit`, `git push`, `checkout`, `rebase`, `reset`, `stash`, `merge` — load and follow the rules in `git-guardian` (`.agents/skills/git-guardian/SKILL.md`).
+Before running **any** git command (`status`, `add`, `commit`, `push`, `checkout`, `rebase`, `reset`, `stash`, `merge`), follow `git-guardian`:
+- Inspect branch and dirty state before mutating files; never operate directly on `main`/`master` without explicit user override.
+- Never run `git reset --hard`, `git push --force`, `git clean -fd`, or unprompted `checkout`/`stash`/`commit`.
+- On any git error: STOP immediately, report repository state, and wait for instructions.
 
-Hard Rules:
-- Run the Pre-flight Checklist (section 0) before touching any file.
-- Classify every git command by its risk level (SAFE / WARNING / DANGEROUS / FORBIDDEN) before executing.
-- Never run FORBIDDEN commands (`git reset --hard`, `git push --force`, `git clean -fd`) without explicit user confirmation.
-- Never switch branches, stash, or commit without explicit user request.
-- On any git error: STOP immediately, report state, wait for user instructions. Do not attempt self-recovery.
+## Gate Honesty & Language Rule (always active)
 
-## Language & Autonomous Interaction Rule (always active)
-
-- **Autonomous Execution in English**: Internal reasoning, planning, state transitions, tool invocation payloads, logs, commit messages, and code comments MUST always be conducted in English.
-- **Mirror User Language**: Accept user inputs in Vietnamese or English. All user-facing communications (clarifying questions from `ka-intake`, design walkthroughs from `ka-plan`/`ka-think`, confirmation prompts from `ka-execute`/`git-guardian`, summary handoffs, and final user reports) MUST match the user's prompt language (defaulting to Vietnamese when the user prompts in Vietnamese). Reference: `standards/LANGUAGE_AND_INTERACTION_STANDARD.md`.
-
+- **Gate Honesty**: Never pass an invented string to `state-manager.js --approved-by-user`; pass only the user's actual reply. Always record RED/GREEN test runs through `state-manager.js test`.
+- **Autonomous English / User Language Mirroring**: Keep internal reasoning, commands, state payloads, commit messages, and code in English; mirror the user's input language (Vietnamese or English) in every question, confirmation, and report.

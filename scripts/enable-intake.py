@@ -14,13 +14,11 @@ END = "<!-- ka:intake-rule:end -->"
 BLOCK = f"""{START}
 ## Intake Rule (always active)
 
-Trước khi implement bất kỳ yêu cầu nào — kể cả yêu cầu "nghe đơn giản" — kiểm tra thông tin đã đủ thành yêu cầu nghiệp vụ hoàn chỉnh chưa, theo checklist trong skill `ka-intake`.
+Trước khi implement yêu cầu mới (trừ sửa typo/cosmetic hoặc câu hỏi chỉ đọc), kiểm tra độ đầy đủ nghiệp vụ theo checklist trong skill `ka-intake`:
 
-- Thiếu field nghiệp vụ mà có thể đổi kết quả → hỏi trước. Không tự suy diễn, không tự chọn mặc định thay user.
-- Giả định kỹ thuật vô hại (tên biến, format code) thì không cần hỏi.
-- "Nghe đơn giản" không phải bằng chứng — đối chiếu checklist, đừng dựa cảm tính.
-- Gộp câu hỏi vào một message, không hỏi từng câu một.
-- Đã có quyết định khoá (`decisions.json`, `status: "locked"`) → coi như intake xong, không hỏi lại.
+- Thiếu field nghiệp vụ trọng yếu (làm đổi hành vi, phân quyền, tiền tệ, xoá dữ liệu) → gom hỏi trong **một message duy nhất** (tối đa 1 vòng cho việc nhỏ, 2 vòng cho việc lớn). Không tự suy diễn thay user.
+- Từ khoá thúc giục ("làm ngay", "nhanh lên") KHÔNG tắt câu hỏi nếu thao tác có rủi ro mất dữ liệu / sai tiền / sai quyền, và KHÔNG bao giờ bỏ qua xác nhận Tier 3–4 (`schema`, `ops`) trong `ka-workflow`.
+- Giả định kỹ thuật vô hại (tên biến, cấu trúc nội bộ) hoặc đã có `decisions.json` (`status: "locked"` chưa consume) → thực hiện luôn, không hỏi lại.
 {END}"""
 
 
