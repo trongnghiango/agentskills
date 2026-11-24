@@ -23,6 +23,7 @@ User request → CLAUDE.md (always‑on Intake Rule) → ka‑intake (completene
 * **ka‑plan** – Technical design facilitator (D1-D5 Socratic flow). Evaluates architectures and outputs a locked `decisions.json` with an `execution_hint`. Never writes code.
 * **ka‑execute** – Pure execution router. Consumes `decisions.json`, validates payload against `option-schemas.md`, applies risk-tier confirmations, and invokes worker skills via `Skill` tool calls.
 * **Worker Skills** – Implementation skills (`ka-be`, `ka-fe`, `ka-db-schema`, `ka-test`, `ka-ops`) that perform the actual code changes or operations.
+* **Language & Autonomous Interaction Rule** – Internal reasoning, autonomous execution, tool calls, logs, and skill code MUST be in English. User-facing interactions (questions, confirmations, handoff notes, and final reports) MUST match the user's input language (Vietnamese/English). Reference: `standards/LANGUAGE_AND_INTERACTION_STANDARD.md`.
 
 ---
 

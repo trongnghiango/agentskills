@@ -55,6 +55,10 @@ An agentskills.io-spec-compliant skill set for AI-agent-driven development, cove
    - Single Screen Viewport Rule: $\le 40-50$ lines/function, $\le 2$ levels of nesting.
    - Anti-Fraud: Zero hardcoded reconciliation (`if id == ...`), algebraic formulas only (`standards/ANTI_AI_GARBAGE_CODE.md`).
 
+7. **Bilingual Interaction & Autonomous English Policy**:
+   - Autonomous engine, tool execution payloads, internal reasoning, and skill definitions execute 100% in English for deterministic reasoning and schema compliance.
+   - Interactive mode automatically mirrors the user's input language (Vietnamese/English) for prompts, clarifying questions, Socratic design steps, risk-tier confirmations, and deliverables (`standards/LANGUAGE_AND_INTERACTION_STANDARD.md`).
+
 ---
 
 ## Why `ka-intake` isn't "just another skill"

@@ -24,3 +24,9 @@ Hard Rules:
 - Never run FORBIDDEN commands (`git reset --hard`, `git push --force`, `git clean -fd`) without explicit user confirmation.
 - Never switch branches, stash, or commit without explicit user request.
 - On any git error: STOP immediately, report state, wait for user instructions. Do not attempt self-recovery.
+
+## Language & Autonomous Interaction Rule (always active)
+
+- **Autonomous Execution in English**: Internal reasoning, planning, state transitions, tool invocation payloads, logs, commit messages, and code comments MUST always be conducted in English.
+- **Mirror User Language**: Accept user inputs in Vietnamese or English. All user-facing communications (clarifying questions from `ka-intake`, design walkthroughs from `ka-plan`/`ka-think`, confirmation prompts from `ka-execute`/`git-guardian`, summary handoffs, and final user reports) MUST match the user's prompt language (defaulting to Vietnamese when the user prompts in Vietnamese). Reference: `standards/LANGUAGE_AND_INTERACTION_STANDARD.md`.
+
