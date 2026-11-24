@@ -1,14 +1,13 @@
 ---
 name: ka-plan
-description: "Socratic technical design and architecture facilitator. Challenges assumptions, maps trade-offs between competing approaches, and produces a locked decision handoff for ka-execute. Never writes executable code. Use when the user is uncertain or comparing options (Vietnamese: \"tại sao\", \"nên\", \"hay là\", \"có nên\", \"giải pháp\", \"so sánh\", \"trade-off\"; English: \"approach\", \"which is better\"), wants deep exploration (\"phân tích\", \"explore\", \"investigate\", \"overview\"), raises cross-module or system-wide impact (\"tích hợp\", \"impact\", \"toàn hệ thống\"), signals unresolved uncertainty (\"chưa rõ\", \"unclear\", \"depends\"), or explicitly asks for a plan/roadmap/strategy (\"kế hoạch\", \"roadmap\", \"strategy\", \"workflow\"). Do not use for requests with an already-obvious, single, concrete target (e.g. \"fix this regex bug\") — those should proceed straight to implementation."
+description: "Design và chốt phương án trước khi code. Dùng khi user nói 'nên', 'có nên', 'hay là', 'so sánh', 'trade-off', 'giải pháp', 'tại sao', 'phân tích', 'kế hoạch', 'roadmap', 'chưa rõ', hoặc phân vân giữa các lựa chọn. Socratic: chất vấn giả định, so sánh trade-off, khoá quyết định cho ka-execute. Không viết code. Do NOT use khi đáp án đã rõ."
 license: Proprietary - internal ka-team use only
-compatibility: Designed for Claude Code. Step D5 runs `node .agents/scripts/state-manager.js`, which requires Node.js and a `.agents/` directory in the repo.
+compatibility: Designed for DeepSeek Harness (DSH). Step D5 runs `node .agents/scripts/state-manager.js`, which requires Node.js and a `.agents/` directory in the repo.
 metadata:
-  version: "5.3.0"
+  version: "5.5.0"
   risk: low
   source: custom-ka-team
 user-invocable: true
-allowed-tools: Write Bash(node .agents/scripts/state-manager.js:*)
 ---
 
 # Ka Plan — Decoupled Technical Reasoning
@@ -64,7 +63,7 @@ This is Socratic reasoning, not a form to fill out. Guide the discussion natural
 - **D3 — Competing Architectures**: Present 2–3 distinct approaches with their real trade-offs (latency, cost, operational complexity, maintenance). Never present a biased strawman.
   🛑 **HARD STOP** — ask: *"Which trade-off are you willing to accept?"*
 - **D4 — Deep Dive**: Flesh out the selected approach — data flow, API contracts, and failure modes (SOFTWARE), or responsibility matrix and communication protocols (GENERAL).
-- **D5 — Context Handoff**: Write `docs/context/xx_tk_design.md` and lock the decision into `.agents/memory/decisions.json` per the schema in `references/handoff-schema.md`. Only set `status: "locked"` once the user has explicitly confirmed the D3 trade-off — never lock on your own inference alone. Then run:
+- **D5 — Context Handoff**: The handoff MUST include `test_plan` (strategy, levels, cases, coverage_target) per `references/handoff-schema.md`; a plan without a test plan is not lockable. Write `docs/context/xx_tk_design.md` and lock the decision into `.agents/memory/decisions.json` per the schema in `references/handoff-schema.md`. Only set `status: "locked"` once the user has explicitly confirmed the D3 trade-off — never lock on your own inference alone. Then run:
   ```bash
   node .agents/scripts/state-manager.js update --proposal [PROPOSAL_TYPE] --route [MODE] --completed-file docs/context/...
   ```
@@ -74,6 +73,10 @@ When `ka-intake` forwards a Fast-Track request (using `templates/fast-track-*.md
 1. **Skip D1–D3 interactive stops**: Synthesize the core problem, select the industry-standard Clean Architecture solution (referencing `references/global-benchmarks.md`), and map out data flow in 1 single turn.
 2. **Lock `decisions.json` immediately**: Derive `execution_hint` automatically and set `status: "locked"`.
 3. Advance state-manager to execution state and hand off to `ka-execute`.
+
+## 2.1 ADR cho COMPLEX_MODE
+
+Khi `route == COMPLEX_MODE` hoặc quyết định khó đảo ngược (schema, auth, tiền): viết ADR theo `templates/ADR.md`, lưu `docs/adr/ADR-<n>-<slug>.md`, trình ở `ADR_APPROVAL_ON_COMPLEX`. ADR thiếu "Phương án đã cân nhắc" hoặc "Hệ quả" thì chưa được duyệt.
 
 ## 3. Technology & Architecture Extensions
 

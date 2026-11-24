@@ -4,17 +4,18 @@ An agentskills.io-spec-compliant skill set for AI-agent-driven development, cove
 
 | Skill | Role | Invocation |
 |---|---|---|
-| `ka-intake` | Requirement completeness checker — asks before the AI assumes | Auto, via the always-on rule in `CLAUDE.md` (`user-invocable: false`) |
+| `ka-intake` | Requirement completeness checker — asks before the AI assumes | Auto, via the always-on rule in `AGENTS.md` (`user-invocable: false`) |
 | `ka-plan` | Socratic design/architecture facilitator | Auto on ambiguous design questions, or `/ka-plan` |
 | `ka-execute` | Risk-tiered execution router to worker skills | Auto after `ka-plan` locks a decision, or `/ka-execute` |
 | `ka-workflow` | Full lifecycle orchestrator (design → build → review → deploy → archive) | `/ka-workflow`, or auto when tracking an in-progress feature |
 | `ka-be` | Backend implementation developer (Clean Architecture & DDD) | Called by `ka-execute` (`user-invocable: false`) |
 | `ka-fe` | Frontend UI implementation developer (React/TanStack) | Called by `ka-execute` (`user-invocable: false`) |
 | `ka-db-schema` | Database schema designer (Drizzle ORM) | Called by `ka-execute` (`user-invocable: false`) |
-| `ka-test` | QA & Test Suite Architect (PGLite integration tests) | Called by developers / execution (`user-invocable: false`) |
+| `ka-test` | TDD coach & Test Suite Architect (PGLite, TDD loop, test design catalog) | Called by developers / execution, or `/ka-test` |
 | `ka-ops` | DevOps & Site Reliability Engineer (Docker/K8s/CI/CD) | Called by `ka-execute` (`user-invocable: false`) |
 | `ka-contract` | API Contract Designer (OpenAPI / Zod / Orval) | Explicit `/ka-contract` or called during pipeline |
-| `ka-review` | Code & Architecture compliance auditor | Explicit `/ka-review` or called during review stage |
+| `ka-review` | Code & Architecture compliance auditor + security depth | Explicit `/ka-review` or called during review stage |
+| `ka-debug` | Systematic debugger: reproduce → minimize → hypothesis → fix + regression test | Auto on bug/crash/flaky, or `/ka-debug` |
 | `git-guardian` | Git Safety Layer (10 Mandatory Rules) | Called during git commands (`user-invocable: false`) |
 
 ---
@@ -63,9 +64,9 @@ An agentskills.io-spec-compliant skill set for AI-agent-driven development, cove
 
 ## Why `ka-intake` isn't "just another skill"
 
-Skills only load when their `description` matches the request — there is no frontmatter field that makes a skill unconditionally active. The one thing that *is* unconditional is `CLAUDE.md`. So the "always ask before assuming" behavior is split across two layers:
+Skills only load when their `description` matches the request — there is no frontmatter field that makes a skill unconditionally active. The one thing that *is* unconditional is `AGENTS.md`. So the "always ask before assuming" behavior is split across two layers:
 
-- **`CLAUDE.md`** (see `CLAUDE.md.snippet` — append this to your project's real `CLAUDE.md`) — the hard, always-loaded rule.
+- **`AGENTS.md`** (see `templates/AGENTS.md.snippet` — append this to your project's real `AGENTS.md`) — the hard, always-loaded rule.
 - **`ka-intake`** — the detailed checklist and question logic that rule points to.
 
 Without both pieces, "always active" doesn't actually hold.
@@ -78,7 +79,7 @@ Without both pieces, "always active" doesn't actually hold.
 User request
      │
      ▼
-CLAUDE.md always-on Intake Rule
+AGENTS.md always-on Intake Rule
      │
      ▼
 ka-intake — completeness checklist
@@ -104,7 +105,7 @@ See `skills/ka-workflow/assets/architecture-overview.mermaid` for the rendered d
 
 ```mermaid
 flowchart TD
-    User(["User request"]) --> CLAUDEMD{{"CLAUDE.md<br/>always-on Intake Rule"}}
+    User(["User request"]) --> CLAUDEMD{{"AGENTS.md<br/>always-on Intake Rule"}}
     CLAUDEMD --> INTAKE["ka-intake<br/>(completeness checklist)"]
     INTAKE -->|"missing material info"| AskUser{{"🛑 batched<br/>clarifying questions<br/>(max 2 rounds)"}}
     AskUser --> INTAKE
@@ -175,7 +176,7 @@ Full option schemas per action: `skills/ka-execute/references/option-schemas.md`
 ## File locations
 
 ```
-CLAUDE.md.snippet                       ← append to your real CLAUDE.md
+templates/AGENTS.md.snippet             ← append to your real AGENTS.md
 skills/
 ├── ka-intake/
 │   ├── SKILL.md
@@ -211,13 +212,19 @@ skills/
 ├── ka-db-schema/
 │   └── SKILL.md
 ├── ka-test/
-│   └── SKILL.md
+│   ├── SKILL.md
+│   ├── references/ (tdd-loop, test-design-catalog)
+│   └── templates/ (factory.ts, test-case.spec.ts)
 ├── ka-ops/
 │   └── SKILL.md
 ├── ka-contract/
 │   └── SKILL.md
 ├── ka-review/
-│   └── SKILL.md
+│   ├── SKILL.md
+│   └── references/ (security-audit.md)
+├── ka-debug/
+│   ├── SKILL.md
+│   └── references/ (root-cause-playbook.md)
 └── git-guardian/
     ├── SKILL.md
     └── references/ (command-classification.md, rules.md, workflows.md)
@@ -226,13 +233,13 @@ skills/
 To set up the skill set inside your target repository, use these commands:
 ```bash
 # Create target skills directory
-mkdir -p your-repo/.claude/skills
+mkdir -p your-repo/.agents/skills
 
 # Copy the structured skills directly
-cp -r skills/* your-repo/.claude/skills/
+cp -r skills/* your-repo/.agents/skills/
 
-# Append the always‑on intake snippet to the target project's CLAUDE.md
-cat CLAUDE.md.snippet >> your-repo/CLAUDE.md
+# Append the always‑on intake snippet to the target project's AGENTS.md
+cat templates/AGENTS.md.snippet >> your-repo/AGENTS.md
 ```
 
 ---
@@ -250,17 +257,20 @@ cat CLAUDE.md.snippet >> your-repo/CLAUDE.md
 
 | Skill | Version | Notes |
 |---|---|---|
-| `ka-intake` | 1.0.0 | New — requirement completeness gate, paired with the CLAUDE.md always-on rule |
-| `ka-plan` | 5.3.0 | Spec-compliant frontmatter, split references, D1 loop-exit, trigger calibration |
+| `ka-intake` | 1.0.0 | New — requirement completeness gate, paired with the AGENTS.md always-on rule |
+| `ka-plan` | 5.5.0 | Spec-compliant frontmatter, split references, D1 loop-exit, trigger calibration |
 | `ka-execute` | 1.5.0 | Spec-compliant frontmatter, Step 0 handoff, Step 4b schema validation, risk-tier confirmation |
 | `ka-workflow` | 5.0.0 | Delegates to `ka-plan`/`ka-execute` instead of routing directly, references `ka-intake`, retry cap on blocker resolution |
-| `ka-be` | 4.2.0 | Clean Architecture & DDD backend developer (Go, NestJS, Hono, Java references) |
-| `ka-fe` | 5.0.0 | React/TanStack frontend developer with Server-Driven UI actions and Query factory |
+| `ka-be` | 4.3.0 | Clean Architecture & DDD backend developer (Go, NestJS, Hono, Java references) |
+| `ka-fe` | 5.2.0 | React/TanStack frontend developer with Server-Driven UI actions and Query factory |
 | `ka-db-schema` | 4.0.0 | Relational schema persistence architect using Drizzle ORM |
-| `ka-test` | 2.0.0 | QA suite architect with PGLite integration testing blueprint |
-| `ka-ops` | 2.1.0 | SRE & DevOps engineer managing Docker, Kubernetes, and CI/CD pipelines |
-| `ka-contract` | 4.0.0 | Contract-first API designer using OpenAPI specifications, Zod schemas, and Orval |
-| `ka-review` | 2.1.0 | Static code analyzer, architecture compliance checker, and domain leak auditor |
-| `git-guardian` | 1.0 | SOP enforcing git safety rules, branch/commit policies, and disaster recovery |
+| `ka-test` | 3.1.0 | TDD loop, TEST_EVIDENCE_GATE contract, test design catalog, typed PGLite blueprint |
+| `ka-debug` | 1.1.0 | Systematic debugger: repro, minimize, hypothesis log, regression test, postmortem (SEV1/2) |
+| `ka-think` | 2.1.0 | Technical thinking facilitator for open problems |
+| `ka-handoff` | 1.1.0 | Handoff document writer for cross-session context |
+| `ka-ops` | 2.3.0 | SRE & DevOps engineer managing Docker, Kubernetes, and CI/CD pipelines |
+| `ka-contract` | 5.0.0 | Contract-first API designer using OpenAPI specifications, Zod schemas, and Orval |
+| `ka-review` | 2.4.0 | Static code analyzer, architecture compliance checker, and domain leak auditor |
+| `git-guardian` | 2.1.0 | SOP enforcing git safety rules, branch/commit policies, and disaster recovery |
 
 Bump the `version` field in a skill's frontmatter whenever its `SKILL.md`, `references/`, or `assets/` change, and record the change in your repo's commit history.

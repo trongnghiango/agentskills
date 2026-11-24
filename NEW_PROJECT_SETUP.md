@@ -7,9 +7,9 @@
 
 ## 1. Skills chung (Ka framework) — ĐÃ CÓ GLOBAL
 
-14 skills framework sau đã được symlink vào `~/.agents/skills/` (tầng user-agents của DSH, rank 500):
+15 skills framework sau đã được symlink vào `~/.agents/skills/` (tầng user-agents của DSH, rank 500):
 
-`git-guardian`, `ka-be`, `ka-contract`, `ka-db-schema`, `ka-execute`, `ka-fe`,
+`git-guardian`, `ka-be`, `ka-contract`, `ka-db-schema`, `ka-debug`, `ka-execute`, `ka-fe`,
 `ka-handoff`, `ka-intake`, `ka-ops`, `ka-plan`, `ka-review`, `ka-test`,
 `ka-think`, `ka-workflow`.
 
@@ -35,6 +35,9 @@ cat > .agents/config/checklist.json <<'EOF'
 { "BE_PLANNING": [] }
 EOF
 ```
+
+> Gate test: từ state `TEST_GATE`, `state-manager.js` từ chối `PASS` nếu thiếu `--evidence <file.json>`
+> với các field `command`, `red_output`, `green_output`, `cases`. Thiếu → exit 2, state không đổi.
 
 > ⚠️ Thêm vào `.gitignore` (state runtime không commit):
 > ```

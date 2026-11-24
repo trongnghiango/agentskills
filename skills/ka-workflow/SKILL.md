@@ -1,14 +1,13 @@
 ---
 name: ka-workflow
-description: Master lifecycle orchestrator for a feature from design through archive. Tracks state via a decoupled state store, delegates design work to ka-plan and all execution routing to ka-execute (never routes directly to worker skills), and presents lifecycle gates (ADR approval, code review, deployment, completion) for user confirmation. Use when the user wants to track, resume, or advance a feature through its full workflow, or asks "where are we" / "what's next" on an in-progress feature.
+description: "Vòng đời feature orchestrator. Dùng khi cần theo dõi/tiếp tục feature qua các gate design → build → review → deploy → archive, hoặc hỏi 'đang ở đâu'. Do NOT use for việc một bước lẻ (đi thẳng ka-plan/ka-execute)."
 license: Proprietary - internal ka-team use only
-compatibility: Designed for Claude Code. Requires Node.js to run `.agents/scripts/state-manager.js` and reads `.agents/config/workflow.json` for gate/state definitions.
+compatibility: Designed for DeepSeek Harness (DSH). Requires Node.js to run `.agents/scripts/state-manager.js` and reads `.agents/config/workflow.json` for gate/state definitions.
 metadata:
   version: "5.0.0"
   risk: high
   source: custom-ka-team
 user-invocable: true
-allowed-tools: Skill Bash(node .agents/scripts/state-manager.js:*) Read
 ---
 
 # Master Workflow Orchestrator (ka-workflow)
@@ -18,7 +17,7 @@ allowed-tools: Skill Bash(node .agents/scripts/state-manager.js:*) Read
 ## 1. Persona & Strategy
 Role: **Chief Project Manager & Workflow Orchestrator**. Tracks the lifecycle state of a feature and hands off work to the specialists that own their domains:
 
-- **`ka-intake`** — owns requirement completeness. Runs before any of the below, triggered by the always-on rule in `CLAUDE.md`, not called by `ka-workflow` directly.
+- **`ka-intake`** — owns requirement completeness. Runs before any of the below, triggered by the always-on rule in `AGENTS.md`, not called by `ka-workflow` directly.
 - **`ka-plan`** — owns all design/architecture reasoning. Called whenever the state machine enters a design or re-design step.
 - **`ka-execute`** — owns all execution routing (backend, frontend, schema, test, ops). Called whenever the state machine enters a build/deploy step.
 
@@ -34,7 +33,7 @@ See `assets/architecture-overview.mermaid` for the high-level relationship betwe
 
 ## 3. Delegation Protocol
 
-0. **Intake** — every request arrives already filtered through `ka-intake` (triggered by the always-on rule in `CLAUDE.md`, not by `ka-workflow` itself). By the time `ka-workflow` sees a request, missing-but-material business fields have already been asked about or explicitly flagged as assumptions. `ka-workflow` does not re-run this check — it trusts the completed requirement it receives.
+0. **Intake** — every request arrives already filtered through `ka-intake` (triggered by the always-on rule in `AGENTS.md`, not by `ka-workflow` itself). By the time `ka-workflow` sees a request, missing-but-material business fields have already been asked about or explicitly flagged as assumptions. `ka-workflow` does not re-run this check — it trusts the completed requirement it receives.
 1. **Design stages** (new feature, re-design, ADR needed, `COMPLEX_MODE` route) → invoke `ka-plan`. Wait for a locked `decisions.json` entry, or an explicit decline, before proceeding.
 2. **Build/deploy stages** → invoke `ka-execute` with no preset action/options. Its own Step 0 finds the locked decision and takes it from there, including its risk-tier ladder and schema validation — `ka-workflow` does not pre-fill or bypass any of it.
 3. **Review stage** — present the walkthrough/diff directly (see `BE_REVIEW_GATE` below); this happens after `ka-execute` returns.

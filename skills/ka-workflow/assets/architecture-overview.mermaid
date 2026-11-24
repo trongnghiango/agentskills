@@ -1,5 +1,5 @@
 flowchart TD
-    User(["User request"]) --> CLAUDEMD{{"CLAUDE.md<br/>always-on Intake Rule"}}
+    User(["User request"]) --> CLAUDEMD{{"AGENTS.md<br/>always-on Intake Rule"}}
     CLAUDEMD --> INTAKE["ka-intake<br/>(completeness checklist)"]
     INTAKE -->|"missing material info"| AskUser{{"🛑 batched<br/>clarifying questions<br/>(max 2 rounds)"}}
     AskUser --> INTAKE

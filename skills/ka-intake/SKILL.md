@@ -1,14 +1,12 @@
 ---
 name: ka-intake
-description: Requirement completeness checker. Before any design or execution work begins, verifies the request contains enough business-level detail (actor, trigger, input, expected output, success criteria, edge cases, constraints, scope boundary) to act on without the AI silently filling gaps with assumptions. Asks batched clarifying questions when information is missing and matters to the outcome. Invoked automatically by the always-on Intake Rule in CLAUDE.md, not typed directly by the user.
+description: "Requirement completeness checker. Dùng khi nhận yêu cầu mới chưa rõ actor/scope/input/output/success criteria — hỏi gom một lượt trước khi thiết kế hay code. Auto qua Intake Rule trong AGENTS.md; /ka-intake cũng gọi được. Do NOT use for việc cosmetic/typo."
 license: Proprietary - internal ka-team use only
-compatibility: Designed for Claude Code. Loaded via the always-on rule in CLAUDE.md — see references/completeness-checklist.md for the field checklist this rule points to.
+compatibility: Designed for DeepSeek Harness (DSH). Loaded via the always-on rule in AGENTS.md — see references/completeness-checklist.md for the field checklist this rule points to.
 metadata:
   version: "1.0.0"
   risk: low
   source: custom-ka-team
-user-invocable: false
-allowed-tools: Read
 ---
 
 # Ka Intake — Requirement Completeness Check
@@ -21,7 +19,7 @@ Sits before `ka-plan` and `ka-execute` in every request. Its only job is to answ
 This is not the same job as `ka-plan`'s D1 Socratic exploration. `ka-plan` challenges *design* assumptions ("why are we doing this, what breaks at scale"). `ka-intake` checks *requirement* completeness ("do we even know who the actor is, what triggers this, what counts as success") — a request can be technically unambiguous in design terms while still missing basic business facts. Both can fire on the same request; `ka-intake` runs first.
 
 ## When this activates
-Triggered by the always-on Intake Rule in `CLAUDE.md` on every request, before `ka-workflow`/`ka-plan`/`ka-execute` begin work — **not** typed directly (`user-invocable: false`). Skipped only if the request already references a locked `decisions.json` entry (intake was already done for that decision).
+Triggered by the always-on Intake Rule in `AGENTS.md` on every request, before `ka-workflow`/`ka-plan`/`ka-execute` begin work — auto via AGENTS.md rule, and callable manually via `/ka-intake`. Skipped only if the request already references a locked `decisions.json` entry (intake was already done for that decision).
 
 ## Dual Execution Modes (Socratic vs Fast-Track)
 

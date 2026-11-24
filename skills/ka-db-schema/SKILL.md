@@ -1,14 +1,13 @@
 ---
 name: ka-db-schema
-description: Database Schema Architect. Focuses strictly on designing Drizzle ORM schemas, database-level enums, relations, composite indexes, and managing migrations.
+description: "Database schema architect (Drizzle ORM). Dùng khi cần thiết kế/đổi bảng, enum, quan hệ, index, hoặc viết migration. Do NOT use for query/repository code (ka-be) hay API contract (ka-contract)."
 license: Proprietary - internal ka-team use only
-compatibility: Designed for Claude Code. Requires Drizzle ORM and drizzle-kit.
+compatibility: Designed for DeepSeek Harness (DSH). Requires Drizzle ORM and drizzle-kit.
 metadata:
   version: "4.0.0"
   risk: high
   source: custom-ka-team
 user-invocable: false
-allowed-tools: Write Bash Read
 ---
 
 # Decoupled Database Schema Designer (ka-db-schema)

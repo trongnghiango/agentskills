@@ -11,7 +11,8 @@ Integration: `ka-workflow` → design stage → `ka-plan`; on completion `ka-wor
 - **ka-be**: backend implementation skill.
 - **ka-fe**: frontend UI implementation skill.
 - **ka-db-schema**: database schema design skill.
-- **ka-test**: testing skill.
+- **ka-test**: TDD coach + test suite architect.
+- **ka-debug**: systematic debugger (repro → hypothesis → fix + regression test).
 - **ka-ops**: operations / deployment skill.
 
 Integration: `ka-execute` routes actions (`backend`, `frontend`, `schema`, `test`, `ops`) to corresponding worker skill.
@@ -20,6 +21,7 @@ Integration: `ka-execute` routes actions (`backend`, `frontend`, `schema`, `test
 - **ka-intake**: requirement completeness checker; always active, loads checklist, and batches clarifying questions.
 - **ka-contract**: contract-first designer for API specifications (OpenAPI) and client validations (Zod/Orval).
 - **ka-review**: code and architecture compliance auditor; scans changes, checks domain leak, and tenant isolation constraints.
+- **ka-handoff**: compact context for the next session/agent.
 - **git-guardian**: git safety layer; enforces branch policies, safe checkouts/commits, and disaster recovery protocol.
 
-All skills expose `metadata` (version, risk, source) and declare `allowed-tools` per spec at https://agentskills.io/specification.
+All skills expose `metadata` (version, risk, source) and a `description` under 500 characters with trigger + anti-trigger (enforced by `scripts/lint-skills.py`).

@@ -1,14 +1,13 @@
 ---
 name: ka-execute
-description: Pure execution router. Consumes a locked decision from ka-plan (or asks the user directly) and forwards a schema-validated action to the matching implementation skill (ka-be, ka-fe, ka-db-schema, ka-contract, ka-test, ka-ops) with risk-tiered confirmation. Never edits repository files itself. Use when the user wants to run, deploy, apply, execute, orchestrate, launch, start, or trigger a backend, frontend, schema, contract, test, or ops action — especially after a design decision has already been made.
+description: "Execution router. Takes a locked decision from ka-plan (or asks directly) and forwards a schema-validated action to the matching worker (ka-be, ka-fe, ka-db-schema, ka-contract, ka-test, ka-ops) with risk-tiered confirmation. Never edits files itself. Use when the user wants to run, deploy, apply, execute, launch, or trigger backend/frontend/schema/contract/test/ops work. Do NOT use for design (ka-plan)."
 license: Proprietary - internal ka-team use only
-compatibility: Designed for Claude Code. Requires the `Skill` tool to route to target skills, and reads `.agents/memory/decisions.json` when present.
+compatibility: Designed for DeepSeek Harness (DSH). Requires the `Skill` tool to route to target skills, and reads `.agents/memory/decisions.json` when present.
 metadata:
   version: "1.5.0"
   risk: medium
   source: custom-ka-team
 user-invocable: true
-allowed-tools: Skill Read
 ---
 
 # Ka Execute – Orchestration / Routing Skill

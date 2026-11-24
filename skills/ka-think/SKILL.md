@@ -1,14 +1,13 @@
 ---
 name: ka-think
-description: General-purpose technical thinking skill. Guides users through structured questioning, design, and architecture decisions without generating implementation code.
+description: "Technical thinking facilitator. Dùng khi cần mổ xẻ vấn đề mở, chọn hướng đi, brainstorm trước khi có yêu cầu rõ. Không viết code, không tạo state. Do NOT use khi yêu cầu đã cụ thể (đi thẳng ka-plan/ka-execute)."
 license: Proprietary - internal ka-team use only
-compatibility: Designed for Claude Code. Works across all project types without repository side-effects.
+compatibility: Designed for DeepSeek Harness (DSH). Works across all project types without repository side-effects.
 metadata:
   version: "2.1.0"
   risk: low
   source: custom-ka-team
 user-invocable: true
-allowed-tools: Read
 ---
 
 # Ka Think – General Technical Reasoning

@@ -1,21 +1,13 @@
 ---
 name: git-guardian
-description: >
-  Git safety and operations layer for AI Agents. Enforces repository safety,
-  branch protection, safe checkouts/commits, and disaster prevention.
-  MANDATORY before executing ANY git command (git status, add, commit, push,
-  checkout, rebase, reset, stash, merge). Triggers on git keywords (English:
-  commit, branch, push, pull, merge, rebase, stash, worktree, git log, git diff;
-  Vietnamese: commit, tạo nhánh, đổi branch, đẩy code, kéo code, gộp nhánh).
-  Violation of these rules is classified as a critical operational failure.
+description: "Git safety layer. MANDATORY before ANY git command (status, add, commit, push, checkout, rebase, reset, stash, merge): branch protection, safe checkouts, commit policy, disaster prevention. Triggers: git, commit, branch, push, pull, merge, rebase, stash, worktree, diff, tạo nhánh, đẩy code, kéo code, gộp nhánh. Do NOT use for non-git tasks."
 license: Proprietary - internal ka-team use only
-compatibility: Designed for Claude Code. Enforces git safety rules across all git operations.
+compatibility: Designed for DeepSeek Harness (DSH). Enforces git safety rules across all git operations.
 metadata:
-  version: "2.0.0"
+  version: "2.1.0"
   risk: low
   source: custom-ka-team
 user-invocable: false
-allowed-tools: Bash(git:*) Read
 ---
 
 # Git Guardian — Standard Operating Procedure

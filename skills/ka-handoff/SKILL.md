@@ -1,15 +1,14 @@
 ---
 name: ka-handoff
-description: Compact the current conversation into a handoff document for another agent to pick up.
+description: "Handoff document writer. Dùng khi cần đóng gói context cho session/agent khác, hoặc sau khi xong feature. Ghi docs/handoff/ với trạng thái, quyết định, việc còn lại. Do NOT use for thiết kế mới (ka-plan)."
 license: Proprietary - internal ka-team use only
-compatibility: Designed for Claude Code. Generates handoff markdown documentation in docs/handoff/.
+compatibility: Designed for DeepSeek Harness (DSH). Generates handoff markdown documentation in docs/handoff/.
 metadata:
   version: "1.1.0"
   risk: low
   source: custom-ka-team
 user-invocable: true
 argument-hint: "What will the next session be used for?"
-allowed-tools: Write Read Bash(git:*)
 ---
 
 # Context Handoff (ka-handoff)
@@ -37,7 +36,7 @@ allowed-tools: Write Read Bash(git:*)
 | State | Current status, one paragraph max |
 | Verification | Last known build/test result (pass/fail) + exact command to re-verify |
 | Constraints | Do-not-touch areas, non-negotiables, anything explicitly out of scope |
-| Risk context | Current risk tier per CLAUDE.md four-tier ladder, if the work touches a classified operation |
+| Risk context | Current risk tier per AGENTS.md four-tier ladder, if the work touches a classified operation |
 | Artifacts | Links/paths to PRDs, plans, ADRs, issues, commits, diffs — reference only, do not duplicate content |
 | Decisions | Pull from `decisions.json` if present in the workspace; else summarize inline |
 | Next steps | Ordered list, actionable |
