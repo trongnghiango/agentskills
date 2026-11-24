@@ -38,8 +38,15 @@ def main() -> int:
         if not text.startswith("---"):
             errors.append(f"{rel}: thiếu frontmatter")
             continue
+        fm_raw = text.split("---")[1]
+        seen_keys = set()
+        for key_match in re.finditer(r"^(\s*[a-zA-Z0-9_-]+)\s*:", fm_raw, re.M):
+            k = key_match.group(1)
+            if k in seen_keys:
+                errors.append(f"{rel}: trùng lặp YAML key '{k.strip()}' trong frontmatter (nghi do merge lỗi)")
+            seen_keys.add(k)
         try:
-            fm = yaml.safe_load(text.split("---")[1]) or {}
+            fm = yaml.safe_load(fm_raw) or {}
         except yaml.YAMLError as exc:
             errors.append(f"{rel}: YAML lỗi: {str(exc).splitlines()[0]}")
             continue
